@@ -12,11 +12,19 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   $device = $result->fetchArray(SQLITE3_ASSOC);
   echo "<strong>Device Serial: ".$device['sn']."</strong> (".$device['comment'].")<br/>";
   echo "Last check time: ".$device['last_check']." <br/>";
-  echo "Last results: TX:".round(($device['last_tx']/1024/1024),2)." Mb RX : ".round(($device['last_rx']/1024/1024),2)." Mb <br/>";
+
+  $last_tx_mb = round(($device['last_tx']/1024/1024),2);
+  $last_tx_gb = round(($device['last_tx']/1024/1024/1024),3);
+  $last_rx_mb = round(($device['last_rx']/1024/1024),2);
+  $last_rx_gb = round(($device['last_rx']/1024/1024/1024),3);
+
+  echo "Last results: <br/>&nbsp;&nbsp;
+          TX: ".$last_tx_gb." <b>GB</b> ".$last_tx_mb."&nbsp;&nbsp <b>MB</b>"."<br/>&nbsp;&nbsp;
+          RX: ".$last_rx_gb." <b>GB</b> ".$last_rx_mb."&nbsp;&nbsp <b>Mb</b> <br/>";
   echo "<br/>";
 
   //get data for chart
-  $getTraffic = $db->prepare('SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? ORDER BY timestamp DESC LIMIT 6');
+  $getTraffic = $db->prepare('SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? ORDER BY timestamp DESC LIMIT 10');
   $getTraffic->bindValue(1, $_GET['id']);
   $results = $getTraffic->execute();
   $chartData = '';
