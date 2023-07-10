@@ -1,6 +1,6 @@
 <?php
 /*
-Usage: /collector.php?sn=<SERIAL NUMBER>&tx=<INTERFACE TX BYTES>&rx=<INTERFACE TX BYTES>&Delata=<any value if needed>
+Usage: /collector.php?sn=<SERIAL NUMBER>&tx=<INTERFACE TX BYTES>&rx=<INTERFACE TX BYTES>&delta=<any value if needed>
 */
 
 require("init.php");
