@@ -3,6 +3,13 @@
 
 require("init.php");
 
+function traf_output($input) {
+  $mb = round(($input/1024/1024),2);
+  $gb = round(($input/1024/1024/1024),3);
+  $tb = round(($input/1024/1024/1024/1024),4);
+  return $tb." <b>TB</b> &nbsp;&nbsp; ".$gb." <b>GB</b> &nbsp;&nbsp; ".$mb." <b>MB</b>";
+}
+
 if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   //get device info
   $getDevice = $db->prepare('SELECT * FROM devices WHERE id = ?');
@@ -13,18 +20,17 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   echo "<strong>Device Serial: ".$device['sn']."</strong> (".$device['comment'].")<br/>";
   echo "Last check time: ".$device['last_check']." <br/>";
 
-  $last_tx_mb = round(($device['last_tx']/1024/1024),2);
-  $last_tx_gb = round(($device['last_tx']/1024/1024/1024),3);
-  $last_rx_mb = round(($device['last_rx']/1024/1024),2);
-  $last_rx_gb = round(($device['last_rx']/1024/1024/1024),3);
+  $last_tx = traf_output($device['last_tx']);
+  $last_rx = traf_output($device['last_rx']);
 
   echo "Last results: <br/>&nbsp;&nbsp;
-          TX: ".$last_tx_gb." <b>GB</b> ".$last_tx_mb."&nbsp;&nbsp <b>MB</b>"."<br/>&nbsp;&nbsp;
-          RX: ".$last_rx_gb." <b>GB</b> ".$last_rx_mb."&nbsp;&nbsp <b>Mb</b> <br/>";
-  echo "<br/>";
+          TX: ".$last_tx."<br/>&nbsp;&nbsp;
+          RX: ".$last_rx;
+  echo "<br/><hr/>";
 
+  $last_checks_number = 48;
   //get data for chart
-  $getTraffic = $db->prepare('SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? ORDER BY timestamp DESC LIMIT 10');
+  $getTraffic = $db->prepare("SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? ORDER BY timestamp DESC LIMIT $last_checks_number");
   $getTraffic->bindValue(1, $_GET['id']);
   $results = $getTraffic->execute();
   $chartData = '';
@@ -36,7 +42,7 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
       $chartData .= "['".date('d M H:i', strtotime($res['timestamp']))."',".round(($res['tx']/1024/1024),2).",".round(($res['rx']/1024/1024),2)."],";
   }
   $results->finalize();
-  #echo $chartData;
+
   ?>
     <head>
       <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -47,13 +53,13 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
         function drawChart() {
           var data = google.visualization.arrayToDataTable([
             ['Date/Time', 'TX (Mb)', 'RX (Mb)'],
-            <?php echo $chartData;?>
+            <?php echo $chartData; ?>
           ]);
 
           var options = {
             chart: {
               title: 'Traffic Stats',
-              subtitle: 'Last 6 hours',
+              subtitle: 'Last <?php echo $last_checks_number; ?> hours',
             }
           };
 
@@ -64,10 +70,11 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
       </script>
     </head>
     <body>
-      <div id="columnchart_material" style="width: 700px; height: 500px;"></div>
+      <div id="columnchart_material" style="width: 100%; height: 500px;"></div>
     </body>
-
+    <hr/>
   <?php
+
   //get summary stats
 
   //get daily stats
@@ -82,10 +89,12 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   //display results
   echo "<strong>Daily Stats</strong><br/>";
   echo "From: ".date('Y-m-d 00:00:00')." to ".date('Y-m-d 23:59:59')."<br/>";
-  echo "TX: ".round(($dailyTraffic['sumtx']/1024/1024),2)." Mb ";
-  echo "RX: ".round(($dailyTraffic['sumrx']/1024/1024),2)." Mb ";
-  echo "Total: ".round((($dailyTraffic['sumtx']+$dailyTraffic['sumrx'])/1024/1024),2)." Mb </br>";
+  echo "TX: ".traf_output($dailyTraffic['sumtx']);
   echo "<br/>";
+  echo "RX: ".traf_output($dailyTraffic['sumrx']);
+  echo "<br/>";
+  echo "Total: ".traf_output($dailyTraffic['sumtx']+$dailyTraffic['sumrx']);
+  echo "<br/><br/>";
 
   //get weekly stats
   //getting sunday and saturday dates for current week
@@ -110,9 +119,9 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   //display results
   echo "<strong>Weekly Stats</strong><br/>";
   echo "From: ".$firstdayofweek->format('Y-m-d 00:00:00')." to ".$lastdayofweek->format('Y-m-d 23:59:59')."<br/>";
-  echo "TX: ".round(($weeklyTraffic['sumtx']/1024/1024),2)." Mb ";
-  echo "RX: ".round(($weeklyTraffic['sumrx']/1024/1024),2)." Mb ";
-  echo "Total: ".round((($weeklyTraffic['sumtx']+$weeklyTraffic['sumrx'])/1024/1024),2)." Mb </br>";
+  echo "TX: ".traf_output($weeklyTraffic['sumtx'])."<br/>";
+  echo "RX: ".traf_output($weeklyTraffic['sumrx'])."<br/>";
+  echo "Total: ".traf_output($weeklyTraffic['sumtx']+$weeklyTraffic['sumrx'])."</br>";
   echo "<br/>";
 
   //get monthly stats
@@ -127,9 +136,9 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   //display results
   echo "<strong>Monthly Stats</strong><br/>";
   echo "From: ".date('Y-m-01 00:00:00')." to ".date('Y-m-t 23:59:59')."<br/>";
-  echo "TX: ".round(($monthlyTraffic['sumtx']/1024/1024),2)." Mb ";
-  echo "RX: ".round(($monthlyTraffic['sumrx']/1024/1024),2)." Mb ";
-  echo "Total: ".round((($monthlyTraffic['sumtx']+$monthlyTraffic['sumrx'])/1024/1024),2)." Mb </br>";
+  echo "TX: ".traf_output($monthlyTraffic['sumtx'])."<br/>";
+  echo "RX: ".traf_output($monthlyTraffic['sumrx'])."<br/>";
+  echo "Total: ".traf_output($monthlyTraffic['sumtx']+$monthlyTraffic['sumrx'])."</br>";
   echo "<br/>";
 
   $result->finalize();
