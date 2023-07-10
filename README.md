@@ -3,10 +3,10 @@ A simple PHP application to collect interface statistics from Mikrotik router an
 You can host this application anywhere on the network or Internet.
 
 The difference from original version:
-Script collects uplink interface tx/rx.
+Script collects TX/RX from the choosen interface w/o firewall rules.
 
 ### Features
-- Collect tx/rx stats from routerboard.
+- Collect tx/rx stats from routerboard's interface.
 - Display hourly graph.
 - Display daily/weekly/monthly summary.
 
