@@ -2,6 +2,9 @@
 A simple PHP application to collect interface statistics from Mikrotik router and display the usage (upload/download).
 You can host this application anywhere on the network or Internet.
 
+The difference from original version:
+Script collects uplink interface tx/rx.
+
 ### Features
 - Collect tx/rx stats from routerboard.
 - Display hourly graph.
@@ -10,25 +13,14 @@ You can host this application anywhere on the network or Internet.
 ## Usage
 Setup the Mikrotik router to collect and send the stats to the application first.
 
-1. Create firewall mangle rules that will collect the traffic stats.
+1. Add the following script that will get the data and send it to the application.
 ```
-/ip firewall mangle
-  add chain=forward src-address=192.168.88.0/24 out-interface=pppoe-out1 action=passthrough comment=local-wan-tx
-  add chain=forward dst-address=192.168.88.0/24 in-interface=pppoe-out1 action=passthrough comment=local-wan-rx
-```
-Here, I am monitoring usage for a specific subnet, going through a PPP connection for Internet.
-
-2. Add the following script that will get the data and send it to the application.
-```
-:local wantxcomment "local-wan-tx"
-:local wanrxcomment "local-wan-rx"
 :local sysnumber [/system routerboard get value-name=serial-number]
-:local txbytes [/ip firewall mangle get [/ip firewall mangle find comment="$wantxcomment"] bytes]
-:local rxbytes [/ip firewall mangle get [/ip firewall mangle find comment="$wanrxcomment"] bytes]
-/tool fetch url=("http://<server ip/url>/collector.php\?sn=$sysnumber&tx=$txbytes&rx=$rxbytes") mode=http keep-result=no
-/ip firewall mangle reset-counters [/ip firewall mangle find comment="$wantxcomment"]
-/ip firewall mangle reset-counters [/ip firewall mangle find comment="$wanrxcomment"]
-:log info ("cleared counters for all mangle rules")
+:local iface "ether3"
+:local txbytes ([/interface get [find name=$iface] tx-byte])
+:local rxbytes ([/interface get [find name=$iface] rx-byte])
+/tool fetch url=("http://<server ip/url>/collector.php\?sn=$sysnumber&tx=$txbytes&rx=$rxbytes&delta=true") mode=http keep-result=no
+:log info ("Traf data sent for $iface, tx $txbytes, rx $rxbytes")
 ```
 Edit the `<server ip/url>` to match where application is hosted.
 
