@@ -1,6 +1,6 @@
 <?php
 //set local timezone
-date_default_timezone_set('Etc/UTC');
+date_default_timezone_set('Europe/Belgrade');
 
 // Create a new database, if the file doesn't exist and open it for reading/writing.
 // The extension of the file is arbitrary.
