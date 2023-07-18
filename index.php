@@ -142,6 +142,21 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   echo "<br/>";
 
   $result->finalize();
+
+  echo "<hr/>";
+
+  //get totals
+  $totals = $db->prepare('SELECT sum(tx) as sumtx, sum(rx) as sumrx FROM traffic WHERE device_id = ?');
+  $totals->bindValue(1, $_GET['id']);
+  $result = $totals->execute();
+  $totalTraffic = $result->fetchArray(SQLITE3_ASSOC);
+  echo "<strong>Total Stats</strong><br/>";
+  echo "TX: ".traf_output($totalTraffic['sumtx'])."<br/>";
+  echo "RX: ".traf_output($totalTraffic['sumrx'])."<br/>";
+  echo "Total: ".traf_output($totalTraffic['sumtx']+$totalTraffic['sumrx'])."</br>";
+  echo "<br/>";
+
+  $result->finalize();
 }
 else {
   $result = $db->query('SELECT * FROM devices');
