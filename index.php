@@ -61,7 +61,7 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
           var options = {
             chart: {
               title: 'Traffic Stats',
-              subtitle: 'Last <?php echo $last_checks_number; ?> hours',
+              subtitle: 'Last 48 hours',
             }
           };
 
