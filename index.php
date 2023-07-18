@@ -29,19 +29,27 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   echo "<br/><hr/>";
 
 
+  $last_hours = 48;
   //get data for chart
-  $getTraffic = $db->prepare("SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? AND timestamp >= ? ORDER BY timestamp DESC");
+  $getTraffic = $db->prepare("SELECT strftime('%Y-%m-%d %H:00:00', timestamp) AS hour,
+                                     SUM(tx) AS total_tx,
+                                     SUM(rx) AS total_rx
+                              FROM traffic
+                              WHERE device_id = ? AND timestamp >= ?
+                              GROUP BY hour
+                              ORDER by hour DESC");
+
   $getTraffic->bindValue(1, $_GET['id']);
-  $date = new DateTime(); $date->modify("-48 hours");
+  $date = new DateTime(); $date->modify("-".$last_hours." hours");
   $getTraffic->bindValue(2, $date->format("Y-m-d H:i:s"));
   $results = $getTraffic->execute();
   $chartData = '';
   while ($res = $results->fetchArray(SQLITE3_ASSOC)){
     #$res = $results->fetchArray(SQLITE3_ASSOC);
     #print_r($res);
-    if(!isset($res['timestamp'])) continue;
+    if(!isset($res['hour'])) continue;
       //set to Google Chart data format
-      $chartData .= "['".date('d M H:i', strtotime($res['timestamp']))."',".round(($res['tx']/1024/1024),2).",".round(($res['rx']/1024/1024),2)."],";
+      $chartData .= "['".date('d M H:i', strtotime($res['hour']))."',".round(($res['total_tx']/1024/1024/1024),2).",".round(($res['total_rx']/1024/1024/1024),2)."],";
   }
   $results->finalize();
 
@@ -54,7 +62,7 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
 
         function drawChart() {
           var data = google.visualization.arrayToDataTable([
-            ['Date/Time', 'TX (Mb)', 'RX (Mb)'],
+            ['Date/Time', 'TX (GB)', 'RX (GB)'],
             <?php echo $chartData; ?>
           ]);
 
