@@ -103,8 +103,8 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   $firstdayofweek = clone $today;
   $lastdayofweek = clone $today;
 
-  ($currentWeekDay != '0')?$firstdayofweek->modify('last Sunday'):'';
-  ($currentWeekDay != '6')?$lastdayofweek->modify('next Saturday'):'';
+  ($currentWeekDay != '0')?$firstdayofweek->modify('last Monday'):'';
+  ($currentWeekDay != '6')?$lastdayofweek->modify('next Sunday'):'';
 
   #echo $firstdayofweek->format('Y-m-d 00:00:00').' to '.$lastdayofweek->format('Y-m-d 23:59:59');
 
