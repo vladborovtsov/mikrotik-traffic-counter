@@ -28,10 +28,12 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
           RX: ".$last_rx;
   echo "<br/><hr/>";
 
-  $last_checks_number = 48;
+
   //get data for chart
-  $getTraffic = $db->prepare("SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? ORDER BY timestamp DESC LIMIT $last_checks_number");
+  $getTraffic = $db->prepare("SELECT timestamp, tx, rx FROM traffic WHERE device_id = ? AND timestamp >= ? ORDER BY timestamp DESC");
   $getTraffic->bindValue(1, $_GET['id']);
+  $date = new DateTime(); $date->modify("-48 hours");
+  $getTraffic->bindValue(2, $date->format("Y-m-d H:i:s"));
   $results = $getTraffic->execute();
   $chartData = '';
   while ($res = $results->fetchArray(SQLITE3_ASSOC)){
