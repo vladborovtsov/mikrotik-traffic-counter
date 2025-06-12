@@ -9,6 +9,8 @@ function traf_output($input, $unit = null) {
   $mb = round(($input/1024/1024),2);
   $gb = round(($input/1024/1024/1024),3);
   $tb = round(($input/1024/1024/1024/1024),4);
+  $pb = round(($input/1024/1024/1024/1024/1024),5);
+  $eb = round(($input/1024/1024/1024/1024/1024/1024),6);
 
   // If a specific unit is requested, return only that unit
   if ($unit) {
@@ -19,13 +21,17 @@ function traf_output($input, $unit = null) {
         return $gb." <b>GB</b>";
       case 'TB':
         return $tb." <b>TB</b>";
+      case 'PB':
+        return $pb." <b>PB</b>";
+      case 'EB':
+        return $eb." <b>EB</b>";
       default:
         return $mb." <b>MB</b>";
     }
   }
 
   // Otherwise return all units (for backward compatibility)
-  return $tb." <b>TB</b> &nbsp;&nbsp; ".$gb." <b>GB</b> &nbsp;&nbsp; ".$mb." <b>MB</b>";
+  return $eb." <b>EB</b> &nbsp;&nbsp; ".$pb." <b>PB</b> &nbsp;&nbsp; ".$tb." <b>TB</b> &nbsp;&nbsp; ".$gb." <b>GB</b> &nbsp;&nbsp; ".$mb." <b>MB</b>";
 }
 
 // Get the selected unit from GET parameter or use default
@@ -88,7 +94,7 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   }
   echo '<label for="unit">Display units as: </label>';
   echo '<select name="unit" id="unit" onchange="document.getElementById(\'unitForm\').submit()">';
-  $units = ['MB', 'GB', 'TB'];
+  $units = ['MB', 'GB', 'TB', 'PB', 'EB'];
   foreach ($units as $unit) {
     $selected = ($unit == $selected_unit) ? 'selected' : '';
     echo '<option value="'.$unit.'" '.$selected.'>'.$unit.'</option>';
@@ -148,6 +154,10 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
     $divisor = 1024 * 1024 * 1024;
   } else if ($selected_unit == 'TB') {
     $divisor = 1024 * 1024 * 1024 * 1024;
+  } else if ($selected_unit == 'PB') {
+    $divisor = 1024 * 1024 * 1024 * 1024 * 1024;
+  } else if ($selected_unit == 'EB') {
+    $divisor = 1024 * 1024 * 1024 * 1024 * 1024 * 1024;
   }
 
   while ($res = $results->fetchArray(SQLITE3_ASSOC)){
