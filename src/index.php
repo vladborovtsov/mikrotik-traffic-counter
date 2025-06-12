@@ -29,7 +29,22 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   echo "<br/><hr/>";
 
 
-  $last_hours = 48;
+  // Default to 48 hours if not specified
+  $last_hours = isset($_GET['period']) ? intval($_GET['period']) : 48;
+
+  // Period selection form
+  echo '<form method="GET" action="">';
+  echo '<input type="hidden" name="id" value="'.$_GET['id'].'">';
+  echo '<label for="period">Select time period (hours): </label>';
+  echo '<select name="period" id="period" onchange="this.form.submit()">';
+  $periods = [12, 24, 48, 72, 168]; // 12h, 24h, 48h, 72h, 7d (168h)
+  foreach ($periods as $period) {
+    $selected = ($period == $last_hours) ? 'selected' : '';
+    echo '<option value="'.$period.'" '.$selected.'>'.$period.' hours</option>';
+  }
+  echo '</select>';
+  echo '</form><br/>';
+
   //get data for chart
   $getTraffic = $db->prepare("SELECT strftime('%Y-%m-%d %H:00:00', timestamp) AS hour,
                                      SUM(tx) AS total_tx,
@@ -37,7 +52,7 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
                               FROM traffic
                               WHERE device_id = ? AND timestamp >= ?
                               GROUP BY hour
-                              ORDER by hour DESC");
+                              ORDER by hour ASC"); // Changed to ASC for chronological display
 
   $getTraffic->bindValue(1, $_GET['id']);
   $date = new DateTime(); $date->modify("-".$last_hours." hours");
@@ -48,8 +63,12 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
     #$res = $results->fetchArray(SQLITE3_ASSOC);
     #print_r($res);
     if(!isset($res['hour'])) continue;
-      //set to Google Chart data format
-      $chartData .= "['".date('d M H:i', strtotime($res['hour']))."',".round(($res['total_tx']/1024/1024/1024),2).",".round(($res['total_rx']/1024/1024/1024),2)."],";
+      // Format date for better display in chart
+      $dateObj = new DateTime($res['hour']);
+      // Use JavaScript Date format for better time-based filtering
+      $chartData .= "[new Date('".date('Y-m-d H:i:s', strtotime($res['hour']))."'),".
+                    round(($res['total_tx']/1024/1024/1024),2).",".
+                    round(($res['total_rx']/1024/1024/1024),2)."],";
   }
   $results->finalize();
 
@@ -57,7 +76,7 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
     <head>
       <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
       <script type="text/javascript">
-        google.charts.load('current', {'packages':['bar']});
+        google.charts.load('current', {'packages':['corechart', 'controls']});
         google.charts.setOnLoadCallback(drawChart);
 
         function drawChart() {
@@ -66,21 +85,73 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
             <?php echo $chartData; ?>
           ]);
 
-          var options = {
-            chart: {
-              title: 'Traffic Stats',
-              subtitle: 'Last 48 hours',
+          // Create a dashboard
+          var dashboard = new google.visualization.Dashboard(
+            document.getElementById('dashboard_div')
+          );
+
+          // Create a range slider
+          var rangeSlider = new google.visualization.ControlWrapper({
+            'controlType': 'ChartRangeFilter',
+            'containerId': 'filter_div',
+            'options': {
+              'filterColumnIndex': 0,
+              'ui': {
+                'chartType': 'LineChart',
+                'chartOptions': {
+                  'chartArea': {'width': '90%'},
+                  'hAxis': {'baselineColor': 'none'}
+                },
+                'chartView': {
+                  'columns': [0, 1, 2]
+                },
+                'minRangeSize': 86400000 // 1 day in milliseconds
+              }
             }
-          };
+          });
 
-          var chart = new google.charts.Bar(document.getElementById('columnchart_material'));
+          // Create a chart
+          var chart = new google.visualization.ChartWrapper({
+            'chartType': 'ComboChart',
+            'containerId': 'chart_div',
+            'options': {
+              'title': 'Traffic Stats',
+              'subtitle': 'Last <?php echo $last_hours; ?> hours',
+              'chartArea': {'width': '90%', 'height': '80%'},
+              'legend': {'position': 'top'},
+              'seriesType': 'bars',
+              'series': {
+                0: {color: '#4285F4'},
+                1: {color: '#DB4437'}
+              },
+              'hAxis': {
+                'title': 'Date/Time'
+              },
+              'vAxis': {
+                'title': 'Traffic (GB)'
+              },
+              'explorer': {
+                'actions': ['dragToZoom', 'rightClickToReset'],
+                'axis': 'horizontal',
+                'keepInBounds': true,
+                'maxZoomIn': 0.01
+              }
+            }
+          });
 
-          chart.draw(data, google.charts.Bar.convertOptions(options));
+          // Bind the chart and range slider
+          dashboard.bind(rangeSlider, chart);
+
+          // Draw the dashboard
+          dashboard.draw(data);
         }
       </script>
     </head>
     <body>
-      <div id="columnchart_material" style="width: 100%; height: 500px;"></div>
+      <div id="dashboard_div" style="width: 100%;">
+        <div id="chart_div" style="width: 100%; height: 400px;"></div>
+        <div id="filter_div" style="width: 100%; height: 100px;"></div>
+      </div>
     </body>
     <hr/>
   <?php
