@@ -268,12 +268,13 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
             'options': {
               'filterColumnIndex': 0,
               'ui': {
-                'chartType': 'LineChart',
+                'chartType': 'AreaChart',
                 'chartOptions': {
                   'chartArea': {'width': '90%', 'height': '50%'},
                   'hAxis': {'baselineColor': 'none'},
                   'colors': ['#4285F4', '#DB4437'],
-                  'lineWidth': 1
+                  'lineWidth': 1,
+                  'areaOpacity': 0.2
                 },
                 'chartView': {
                   'columns': [0, 1, 2]
@@ -299,12 +300,27 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
               ?>',
               'chartArea': {'width': '90%', 'height': '80%'},
               'legend': {'position': 'top'},
-              'seriesType': 'line',
+              'seriesType': 'area',
               'series': {
-                0: {color: '#4285F4', lineWidth: 2, pointSize: 3},
-                1: {color: '#DB4437', lineWidth: 2, pointSize: 3}
+                0: {color: '#4285F4', lineWidth: 2, pointSize: 3, areaOpacity: 0.3},
+                1: {color: '#DB4437', lineWidth: 2, pointSize: 3, areaOpacity: 0.3}
               },
-              'tooltip': { 'isHtml': true, 'trigger': 'both' },
+              'focusTarget': 'category',
+              'tooltip': { 
+                'isHtml': true, 
+                'trigger': 'both',
+                'showColorCode': true,
+                formatter: function(date, dataTable) {
+                  var dateStr = new Date(date.getValue()).toLocaleString();
+                  var tx = dataTable.getValue(date.row, 1);
+                  var rx = dataTable.getValue(date.row, 2);
+                  return '<div style="padding:10px; border:1px solid #ccc; background-color:#fff;">' +
+                         '<strong>' + dateStr + '</strong><br>' +
+                         '<span style="color:#4285F4;"><b>TX:</b> ' + tx + ' <?php echo $selected_unit; ?></span><br>' +
+                         '<span style="color:#DB4437;"><b>RX:</b> ' + rx + ' <?php echo $selected_unit; ?></span>' +
+                         '</div>';
+                }
+              },
               'curveType': 'function',
               'crosshair': { 'trigger': 'both', 'orientation': 'both' },
               'hAxis': {
