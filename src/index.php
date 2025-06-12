@@ -80,6 +80,12 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
     }
   </style>';
 
+  // Default to 48 hours if not specified
+  $window_length = isset($_GET['window']) ? intval($_GET['window']) : 48;
+
+  // Default offset is 0 (current time window)
+  $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
+
   echo '<div class="card">';
   echo "<div class='card-title'>Device Information</div>";
   echo "<strong>Device Serial: ".$device['sn']."</strong> (".$device['comment'].")<br/>";
@@ -89,9 +95,8 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
   echo '<div class="form-group">';
   echo '<form method="GET" action="" id="unitForm">';
   echo '<input type="hidden" name="id" value="'.$_GET['id'].'">';
-  if (isset($_GET['period'])) {
-    echo '<input type="hidden" name="period" value="'.$_GET['period'].'">';
-  }
+  echo '<input type="hidden" name="window" value="'.$window_length.'">';
+  echo '<input type="hidden" name="offset" value="'.$offset.'">';
   echo '<label for="unit">Display units as: </label>';
   echo '<select name="unit" id="unit" onchange="document.getElementById(\'unitForm\').submit()">';
   $units = ['MB', 'GB', 'TB', 'PB', 'EB'];
@@ -111,26 +116,80 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
           RX: ".$last_rx;
   echo '</div>';
 
-
-  // Default to 48 hours if not specified
-  $last_hours = isset($_GET['period']) ? intval($_GET['period']) : 48;
-
-  // Period selection form
+  // Window length selection form
   echo '<div class="form-group">';
-  echo '<form method="GET" action="">';
+  echo '<form method="GET" action="" id="windowForm">';
   echo '<input type="hidden" name="id" value="'.$_GET['id'].'">';
   if (isset($_GET['unit'])) {
     echo '<input type="hidden" name="unit" value="'.$_GET['unit'].'">';
   }
-  echo '<label for="period">Select time period (hours): </label>';
-  echo '<select name="period" id="period" onchange="this.form.submit()">';
-  $periods = [12, 24, 48, 72, 168]; // 12h, 24h, 48h, 72h, 7d (168h)
-  foreach ($periods as $period) {
-    $selected = ($period == $last_hours) ? 'selected' : '';
-    echo '<option value="'.$period.'" '.$selected.'>'.$period.' hours</option>';
+  echo '<input type="hidden" name="offset" value="'.$offset.'">';
+  echo '<label for="window">Window length: </label>';
+  echo '<select name="window" id="window" onchange="document.getElementById(\'windowForm\').submit()">';
+
+  // Hours options
+  echo '<optgroup label="Hours">';
+  $hour_options = [1, 3, 6, 9, 12, 24, 48, 72];
+  foreach ($hour_options as $hours) {
+    $selected = ($hours == $window_length) ? 'selected' : '';
+    echo '<option value="'.$hours.'" '.$selected.'>'.$hours.' hours</option>';
   }
+  echo '</optgroup>';
+
+  // Days options
+  echo '<optgroup label="Days">';
+  $day_options = [1, 2, 3, 7, 14, 30, 60, 90, 180];
+  foreach ($day_options as $days) {
+    $hours = $days * 24;
+    $selected = ($hours == $window_length) ? 'selected' : '';
+    echo '<option value="'.$hours.'" '.$selected.'>'.$days.' days</option>';
+  }
+  echo '</optgroup>';
+
   echo '</select>';
   echo '</form>';
+
+  // Navigation buttons
+  echo '<div style="margin-top: 10px; display: flex; gap: 10px;">';
+
+  // Left button (older data)
+  echo '<form method="GET" action="">';
+  echo '<input type="hidden" name="id" value="'.$_GET['id'].'">';
+  echo '<input type="hidden" name="window" value="'.$window_length.'">';
+  if (isset($_GET['unit'])) {
+    echo '<input type="hidden" name="unit" value="'.$_GET['unit'].'">';
+  }
+  echo '<input type="hidden" name="offset" value="'.($offset + 1).'">';
+  echo '<button type="submit">← Older</button>';
+  echo '</form>';
+
+  // Reset button (current time)
+  if ($offset > 0) {
+    echo '<form method="GET" action="">';
+    echo '<input type="hidden" name="id" value="'.$_GET['id'].'">';
+    echo '<input type="hidden" name="window" value="'.$window_length.'">';
+    if (isset($_GET['unit'])) {
+      echo '<input type="hidden" name="unit" value="'.$_GET['unit'].'">';
+    }
+    echo '<input type="hidden" name="offset" value="0">';
+    echo '<button type="submit">Current</button>';
+    echo '</form>';
+  }
+
+  // Right button (newer data) - only if we're not at the current time
+  if ($offset > 0) {
+    echo '<form method="GET" action="">';
+    echo '<input type="hidden" name="id" value="'.$_GET['id'].'">';
+    echo '<input type="hidden" name="window" value="'.$window_length.'">';
+    if (isset($_GET['unit'])) {
+      echo '<input type="hidden" name="unit" value="'.$_GET['unit'].'">';
+    }
+    echo '<input type="hidden" name="offset" value="'.($offset - 1).'">';
+    echo '<button type="submit">Newer →</button>';
+    echo '</form>';
+  }
+
+  echo '</div>';
   echo '</div>';
 
   //get data for chart
@@ -138,13 +197,24 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
                                      SUM(tx) AS total_tx,
                                      SUM(rx) AS total_rx
                               FROM traffic
-                              WHERE device_id = ? AND timestamp >= ?
+                              WHERE device_id = ? AND timestamp >= ? AND timestamp <= ?
                               GROUP BY hour
                               ORDER by hour ASC"); // Changed to ASC for chronological display
 
   $getTraffic->bindValue(1, $_GET['id']);
-  $date = new DateTime(); $date->modify("-".$last_hours." hours");
-  $getTraffic->bindValue(2, $date->format("Y-m-d H:i:s"));
+
+  // Calculate start and end dates based on window length and offset
+  $end_date = new DateTime();
+  if ($offset > 0) {
+    // If offset is set, move end date back by (offset * window_length) hours
+    $end_date->modify("-".($offset * $window_length)." hours");
+  }
+
+  $start_date = clone $end_date;
+  $start_date->modify("-".$window_length." hours");
+
+  $getTraffic->bindValue(2, $start_date->format("Y-m-d H:i:s"));
+  $getTraffic->bindValue(3, $end_date->format("Y-m-d H:i:s"));
   $results = $getTraffic->execute();
   $chartData = '';
 
@@ -200,13 +270,16 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
               'ui': {
                 'chartType': 'LineChart',
                 'chartOptions': {
-                  'chartArea': {'width': '90%'},
-                  'hAxis': {'baselineColor': 'none'}
+                  'chartArea': {'width': '90%', 'height': '50%'},
+                  'hAxis': {'baselineColor': 'none'},
+                  'colors': ['#4285F4', '#DB4437'],
+                  'lineWidth': 1
                 },
                 'chartView': {
                   'columns': [0, 1, 2]
                 },
-                'minRangeSize': 86400000 // 1 day in milliseconds
+                'minRangeSize': 3600000, // 1 hour in milliseconds
+                'snapToData': true
               }
             }
           });
@@ -217,14 +290,23 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
             'containerId': 'chart_div',
             'options': {
               'title': 'Traffic Stats',
-              'subtitle': 'Last <?php echo $last_hours; ?> hours',
+              'subtitle': '<?php 
+                if ($offset == 0) {
+                  echo "Last " . $window_length . " hours";
+                } else {
+                  echo $start_date->format("Y-m-d H:i") . " to " . $end_date->format("Y-m-d H:i");
+                }
+              ?>',
               'chartArea': {'width': '90%', 'height': '80%'},
               'legend': {'position': 'top'},
-              'seriesType': 'bars',
+              'seriesType': 'line',
               'series': {
-                0: {color: '#4285F4'},
-                1: {color: '#DB4437'}
+                0: {color: '#4285F4', lineWidth: 2, pointSize: 3},
+                1: {color: '#DB4437', lineWidth: 2, pointSize: 3}
               },
+              'tooltip': { 'isHtml': true, 'trigger': 'both' },
+              'curveType': 'function',
+              'crosshair': { 'trigger': 'both', 'orientation': 'both' },
               'hAxis': {
                 'title': 'Date/Time'
               },
@@ -232,8 +314,8 @@ if (isset($_GET['id']) and is_numeric($_GET['id'])) {
                 'title': 'Traffic (<?php echo $selected_unit; ?>)'
               },
               'explorer': {
-                'actions': ['dragToZoom', 'rightClickToReset'],
-                'axis': 'horizontal',
+                'actions': ['dragToZoom', 'rightClickToReset', 'dragToPan'],
+                'axis': 'both',
                 'keepInBounds': true,
                 'maxZoomIn': 0.01
               }
