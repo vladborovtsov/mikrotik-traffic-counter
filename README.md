@@ -35,8 +35,8 @@ Edit the `<script name>` to match the actual script.
 ## Sample Screenshot
 ![Screenshot](index_screenshot.png)
 
-## Author
-Mohamed Muhannad ([@monde_](https://twitter.com/monde_))
+## Inspired by 
+https://github.com/muhannad0/mikrotik-traffic-counter
 
 ## Acknowledgements
 - [tikstat](https://github.com/mrkrasser/tikstat) project
