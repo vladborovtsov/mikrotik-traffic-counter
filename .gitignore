@@ -3,3 +3,6 @@
 
 #Ignore mikrotik configuration
 mikrotik_configuration.txt
+
+#.idea
+.idea
