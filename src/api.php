@@ -12,8 +12,8 @@ function getSumStats($db, $id, $start, $end) {
     $stmt->bindValue(3, $end, SQLITE3_TEXT);
     $res = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
     return [
-        'sumtx' => $res['sumtx'] ?? 0,
-        'sumrx' => $res['sumrx'] ?? 0
+        'sumtx' => floatval($res['sumtx'] ?? 0),
+        'sumrx' => floatval($res['sumrx'] ?? 0)
     ];
 }
 
@@ -23,6 +23,8 @@ switch ($action) {
         $devices = [];
         if ($result) {
             while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+                $row['last_tx'] = floatval($row['last_tx'] ?? 0);
+                $row['last_rx'] = floatval($row['last_rx'] ?? 0);
                 $devices[] = $row;
             }
         }
@@ -45,6 +47,8 @@ switch ($action) {
             echo json_encode(['error' => 'Device not found']);
             exit;
         }
+        $device['last_tx'] = floatval($device['last_tx'] ?? 0);
+        $device['last_rx'] = floatval($device['last_rx'] ?? 0);
 
         // Window and offset logic
         $window = isset($_GET['window']) ? intval($_GET['window']) : 48;
@@ -75,8 +79,8 @@ switch ($action) {
         while ($row = $trafficResult->fetchArray(SQLITE3_ASSOC)) {
             $chartData[] = [
                 'hour' => $row['hour'],
-                'tx' => $row['tx'] ?? 0,
-                'rx' => $row['rx'] ?? 0
+                'tx' => floatval($row['tx'] ?? 0),
+                'rx' => floatval($row['rx'] ?? 0)
             ];
         }
 
@@ -109,8 +113,8 @@ switch ($action) {
         $totalsStmt->bindValue(1, $id, SQLITE3_INTEGER);
         $totalsRes = $totalsStmt->execute()->fetchArray(SQLITE3_ASSOC);
         $totals = [
-            'sumtx' => $totalsRes['sumtx'] ?? 0,
-            'sumrx' => $totalsRes['sumrx'] ?? 0
+            'sumtx' => floatval($totalsRes['sumtx'] ?? 0),
+            'sumrx' => floatval($totalsRes['sumrx'] ?? 0)
         ];
 
         echo json_encode([

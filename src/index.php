@@ -227,21 +227,21 @@
                             From: ${stats.daily.range.from} to ${stats.daily.range.to}<br/>
                             TX: ${formatTraffic(stats.daily.data.sumtx, params.unit)}<br/>
                             RX: ${formatTraffic(stats.daily.data.sumrx, params.unit)}<br/>
-                            Total: ${formatTraffic((stats.daily.data.sumtx || 0) + (stats.daily.data.sumrx || 0), params.unit)}
+                            Total: ${formatTraffic(Number(stats.daily.data.sumtx || 0) + Number(stats.daily.data.sumrx || 0), params.unit)}
                         </div>
                         <div class="card" style="flex: 1;">
                             <div class='card-title'>Weekly Stats</div>
                             From: ${stats.weekly.range.from} to ${stats.weekly.range.to}<br/>
                             TX: ${formatTraffic(stats.weekly.data.sumtx, params.unit)}<br/>
                             RX: ${formatTraffic(stats.weekly.data.sumrx, params.unit)}<br/>
-                            Total: ${formatTraffic((stats.weekly.data.sumtx || 0) + (stats.weekly.data.sumrx || 0), params.unit)}
+                            Total: ${formatTraffic(Number(stats.weekly.data.sumtx || 0) + Number(stats.weekly.data.sumrx || 0), params.unit)}
                         </div>
                         <div class="card" style="flex: 1;">
                             <div class='card-title'>Monthly Stats</div>
                             From: ${stats.monthly.range.from} to ${stats.monthly.range.to}<br/>
                             TX: ${formatTraffic(stats.monthly.data.sumtx, params.unit)}<br/>
                             RX: ${formatTraffic(stats.monthly.data.sumrx, params.unit)}<br/>
-                            Total: ${formatTraffic((stats.monthly.data.sumtx || 0) + (stats.monthly.data.sumrx || 0), params.unit)}
+                            Total: ${formatTraffic(Number(stats.monthly.data.sumtx || 0) + Number(stats.monthly.data.sumrx || 0), params.unit)}
                         </div>
                     </div>
 
@@ -249,7 +249,7 @@
                         <div class='card-title'>Total Stats</div>
                         TX: ${formatTraffic(stats.total.data.sumtx, params.unit)}<br/>
                         RX: ${formatTraffic(stats.total.data.sumrx, params.unit)}<br/>
-                        Total: ${formatTraffic((stats.total.data.sumtx || 0) + (stats.total.data.sumrx || 0), params.unit)}
+                        Total: ${formatTraffic(Number(stats.total.data.sumtx || 0) + Number(stats.total.data.sumrx || 0), params.unit)}
                     </div>
                     
                     <button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>
