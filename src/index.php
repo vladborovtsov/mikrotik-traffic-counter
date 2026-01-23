@@ -76,7 +76,7 @@
     </div>
 
     <script>
-        const app = document.getElementById('app');
+        const appContainer = document.getElementById('app');
         
         // Configuration from URL
         function getParams() {
@@ -89,20 +89,21 @@
             };
         }
 
-        function setParams(params) {
-            const url = new URL(window.location);
+        function setParams(newParams) {
             const current = getParams();
-            const newParams = { ...current, ...params };
+            const merged = { ...current, ...newParams };
             
-            Object.keys(newParams).forEach(key => {
-                if (newParams[key] !== null && newParams[key] !== undefined) {
-                    url.searchParams.set(key, newParams[key]);
-                } else {
-                    url.searchParams.delete(key);
+            const searchParams = new URLSearchParams();
+            Object.keys(merged).forEach(key => {
+                if (merged[key] !== null && merged[key] !== undefined && merged[key] !== '') {
+                    searchParams.set(key, merged[key]);
                 }
             });
-            window.history.pushState({}, '', url);
-            render();
+            
+            const newSearch = searchParams.toString() ? '?' + searchParams.toString() : '';
+            if (newSearch !== window.location.search) {
+                window.location.search = newSearch;
+            }
         }
 
         function formatTraffic(input, unit = null) {
@@ -128,156 +129,152 @@
 
         async function render() {
             const params = getParams();
-            app.innerHTML = '<div id="loading">Loading...</div>';
 
-            if (!params.id) {
-                await renderDeviceList();
-            } else {
-                await renderDeviceDetails(params);
-            }
-        }
+            appContainer.innerHTML = '<div id="loading">Loading...</div>';
 
-        async function renderDeviceList() {
             try {
-                const response = await fetch('api.php?action=getDevices');
-                const devices = await response.json();
+                if (!params.id) {
+                    const response = await fetch('api.php?action=getDevices');
+                    const devices = await response.json();
+                    renderDeviceListUI(devices);
+                } else {
+                    const response = await fetch(`api.php?action=getDeviceData&id=${params.id}&window=${params.window}&offset=${params.offset}`);
+                    const data = await response.json();
 
-                if (devices.length === 0) {
-                    app.innerHTML = '<div class="card">No devices found.</div>';
-                    return;
+                    if (data.error) {
+                        appContainer.innerHTML = `<div class="card">Error: ${data.error}</div><button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>`;
+                        return;
+                    }
+
+                    renderDeviceDetailsUI(data, params);
                 }
-
-                let html = '<div class="device-list"><h2>Available Devices</h2>';
-                devices.forEach(device => {
-                    html += `
-                        <div class="device-item">
-                            <a href="?id=${device.id}" onclick="event.preventDefault(); setParams({id: ${device.id}})">
-                                <strong>${device.sn}</strong>
-                            </a> (${device.comment || ''}) Last check: ${device.last_check || 'never'}<br/>
-                        </div>`;
-                });
-                html += '</div>';
-                app.innerHTML = html;
             } catch (error) {
-                app.innerHTML = `<div class="card">Error loading devices: ${error.message}</div>`;
+                appContainer.innerHTML = `<div class="card">Error: ${error.message}</div>`;
+                console.error(error);
             }
         }
 
-        async function renderDeviceDetails(params) {
-            try {
-                const response = await fetch(`api.php?action=getDeviceData&id=${params.id}&window=${params.window}&offset=${params.offset}`);
-                const data = await response.json();
+        function renderDeviceListUI(devices) {
+            if (devices.length === 0) {
+                appContainer.innerHTML = '<div class="card">No devices found.</div>';
+                return;
+            }
 
-                if (data.error) {
-                    app.innerHTML = `<div class="card">Error: ${data.error}</div><button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>`;
-                    return;
-                }
+            let html = '<div class="device-list"><h2>Available Devices</h2>';
+            devices.forEach(device => {
+                html += `
+                    <div class="device-item">
+                        <a href="?id=${device.id}" onclick="event.preventDefault(); setParams({id: ${device.id}})">
+                            <strong>${device.sn}</strong>
+                        </a> (${device.comment || ''}) Last check: ${device.last_check || 'never'}<br/>
+                    </div>`;
+            });
+            html += '</div>';
+            appContainer.innerHTML = html;
+        }
 
-                const device = data.device;
-                const stats = data.stats;
-                const windowData = data.window;
+        function renderDeviceDetailsUI(data, params) {
+            const device = data.device;
+            const stats = data.stats;
+            const windowData = data.window;
 
-                let html = `
-                    <div class="card">
-                        <div class='card-title'>Device Information</div>
-                        <strong>Device Serial: ${device.sn}</strong> (${device.comment || ''})<br/>
-                        Last check time: ${device.last_check || 'never'} <br/>
-                        
-                        <div class="form-group" style="margin-top: 15px;">
-                            <label for="unitSelector">Display units as: </label>
-                            <select id="unitSelector">
-                                ${['MB', 'GB', 'TB', 'PB', 'EB'].map(u => `<option value="${u}" ${u === params.unit ? 'selected' : ''}>${u}</option>`).join('')}
-                            </select>
-                        </div>
-                        
-                        Last results: <br/>&nbsp;&nbsp;
-                        TX: ${formatTraffic(device.last_tx, params.unit)}<br/>&nbsp;&nbsp;
-                        RX: ${formatTraffic(device.last_rx, params.unit)}
-                    </div>
-
-                    <div class="form-group">
-                        <label for="windowSelector">Window length: </label>
-                        <select id="windowSelector">
-                            <optgroup label="Hours">
-                                ${[1, 3, 6, 9, 12, 24, 48, 72].map(h => `<option value="${h}" ${h === params.window ? 'selected' : ''}>${h} hours</option>`).join('')}
-                            </optgroup>
-                            <optgroup label="Days">
-                                ${[1, 2, 3, 7, 14, 30, 60, 90, 180].map(d => `<option value="${d*24}" ${d*24 === params.window ? 'selected' : ''}>${d} days</option>`).join('')}
-                            </optgroup>
+            let html = `
+                <div class="card">
+                    <div class='card-title'>Device Information</div>
+                    <strong>Device Serial: ${device.sn}</strong> (${device.comment || ''})<br/>
+                    Last check time: ${device.last_check || 'never'} <br/>
+                    
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label for="unitSelector">Display units as: </label>
+                        <select id="unitSelector">
+                            ${['MB', 'GB', 'TB', 'PB', 'EB'].map(u => `<option value="${u}" ${u === params.unit ? 'selected' : ''}>${u}</option>`).join('')}
                         </select>
-
-                        <div class="nav-buttons">
-                            <button id="olderBtn">← Older</button>
-                            ${params.offset > 0 ? `<button id="currentBtn">Current</button>` : ''}
-                            ${params.offset > 0 ? `<button id="newerBtn">Newer →</button>` : ''}
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-title">Traffic Chart</div>
-                        <div id="dashboard_div" style="width: 100%;">
-                            <div id="chart_div" style="width: 100%; height: 400px;"></div>
-                            <div id="filter_div" style="width: 100%; height: 100px;"></div>
-                        </div>
-                    </div>
-
-                    <div class="stats-row">
-                        <div class="card" style="flex: 1;">
-                            <div class='card-title'>Daily Stats</div>
-                            From: ${stats.daily.range.from} to ${stats.daily.range.to}<br/>
-                            TX: ${formatTraffic(stats.daily.data.sumtx, params.unit)}<br/>
-                            RX: ${formatTraffic(stats.daily.data.sumrx, params.unit)}<br/>
-                            Total: ${formatTraffic(Number(stats.daily.data.sumtx || 0) + Number(stats.daily.data.sumrx || 0), params.unit)}
-                        </div>
-                        <div class="card" style="flex: 1;">
-                            <div class='card-title'>Weekly Stats</div>
-                            From: ${stats.weekly.range.from} to ${stats.weekly.range.to}<br/>
-                            TX: ${formatTraffic(stats.weekly.data.sumtx, params.unit)}<br/>
-                            RX: ${formatTraffic(stats.weekly.data.sumrx, params.unit)}<br/>
-                            Total: ${formatTraffic(Number(stats.weekly.data.sumtx || 0) + Number(stats.weekly.data.sumrx || 0), params.unit)}
-                        </div>
-                        <div class="card" style="flex: 1;">
-                            <div class='card-title'>Monthly Stats</div>
-                            From: ${stats.monthly.range.from} to ${stats.monthly.range.to}<br/>
-                            TX: ${formatTraffic(stats.monthly.data.sumtx, params.unit)}<br/>
-                            RX: ${formatTraffic(stats.monthly.data.sumrx, params.unit)}<br/>
-                            Total: ${formatTraffic(Number(stats.monthly.data.sumtx || 0) + Number(stats.monthly.data.sumrx || 0), params.unit)}
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class='card-title'>Total Stats</div>
-                        TX: ${formatTraffic(stats.total.data.sumtx, params.unit)}<br/>
-                        RX: ${formatTraffic(stats.total.data.sumrx, params.unit)}<br/>
-                        Total: ${formatTraffic(Number(stats.total.data.sumtx || 0) + Number(stats.total.data.sumrx || 0), params.unit)}
                     </div>
                     
-                    <button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>
-                    <hr/>
-                `;
-                app.innerHTML = html;
+                    Last results: <br/>&nbsp;&nbsp;
+                    TX: ${formatTraffic(device.last_tx, params.unit)}<br/>&nbsp;&nbsp;
+                    RX: ${formatTraffic(device.last_rx, params.unit)}
+                </div>
 
-                // Event Listeners
-                document.getElementById('unitSelector').addEventListener('change', (e) => setParams({unit: e.target.value}));
-                document.getElementById('windowSelector').addEventListener('change', (e) => setParams({window: parseInt(e.target.value), offset: 0}));
-                document.getElementById('olderBtn').addEventListener('click', () => setParams({offset: params.offset + 1}));
-                if (document.getElementById('currentBtn')) {
-                    document.getElementById('currentBtn').addEventListener('click', () => setParams({offset: 0}));
-                }
-                if (document.getElementById('newerBtn')) {
-                    document.getElementById('newerBtn').addEventListener('click', () => setParams({offset: params.offset - 1}));
-                }
+                <div class="form-group">
+                    <label for="windowSelector">Window length: </label>
+                    <select id="windowSelector">
+                        <optgroup label="Hours">
+                            ${[1, 3, 6, 9, 12, 24, 48, 72].map(h => `<option value="${h}" ${h === params.window ? 'selected' : ''}>${h} hours</option>`).join('')}
+                        </optgroup>
+                        <optgroup label="Days">
+                            ${[1, 2, 3, 7, 14, 30, 60, 90, 180].map(d => `<option value="${d*24}" ${d*24 === params.window ? 'selected' : ''}>${d} days</option>`).join('')}
+                        </optgroup>
+                    </select>
 
-                // Draw Chart
-                if (google.visualization && google.visualization.Dashboard) {
-                    drawChart(data, params.unit, windowData);
-                } else {
-                    google.charts.setOnLoadCallback(() => drawChart(data, params.unit, windowData));
-                }
+                    <div class="nav-buttons">
+                        <button id="olderBtn">← Older</button>
+                        ${params.offset > 0 ? `<button id="currentBtn">Current</button>` : ''}
+                        ${params.offset > 0 ? `<button id="newerBtn">Newer →</button>` : ''}
+                    </div>
+                </div>
 
-            } catch (error) {
-                app.innerHTML = `<div class="card">Error loading device details: ${error.message}</div><button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>`;
-                console.error(error);
+                <div class="card">
+                    <div class="card-title">Traffic Chart</div>
+                    <div id="dashboard_div" style="width: 100%;">
+                        <div id="chart_div" style="width: 100%; height: 400px;"></div>
+                        <div id="filter_div" style="width: 100%; height: 100px;"></div>
+                    </div>
+                </div>
+
+                <div class="stats-row">
+                    <div class="card" style="flex: 1;">
+                        <div class='card-title'>Daily Stats</div>
+                        From: ${stats.daily.range.from} to ${stats.daily.range.to}<br/>
+                        TX: ${formatTraffic(stats.daily.data.sumtx, params.unit)}<br/>
+                        RX: ${formatTraffic(stats.daily.data.sumrx, params.unit)}<br/>
+                        Total: ${formatTraffic(Number(stats.daily.data.sumtx || 0) + Number(stats.daily.data.sumrx || 0), params.unit)}
+                    </div>
+                    <div class="card" style="flex: 1;">
+                        <div class='card-title'>Weekly Stats</div>
+                        From: ${stats.weekly.range.from} to ${stats.weekly.range.to}<br/>
+                        TX: ${formatTraffic(stats.weekly.data.sumtx, params.unit)}<br/>
+                        RX: ${formatTraffic(stats.weekly.data.sumrx, params.unit)}<br/>
+                        Total: ${formatTraffic(Number(stats.weekly.data.sumtx || 0) + Number(stats.weekly.data.sumrx || 0), params.unit)}
+                    </div>
+                    <div class="card" style="flex: 1;">
+                        <div class='card-title'>Monthly Stats</div>
+                        From: ${stats.monthly.range.from} to ${stats.monthly.range.to}<br/>
+                        TX: ${formatTraffic(stats.monthly.data.sumtx, params.unit)}<br/>
+                        RX: ${formatTraffic(stats.monthly.data.sumrx, params.unit)}<br/>
+                        Total: ${formatTraffic(Number(stats.monthly.data.sumtx || 0) + Number(stats.monthly.data.sumrx || 0), params.unit)}
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class='card-title'>Total Stats</div>
+                    TX: ${formatTraffic(stats.total.data.sumtx, params.unit)}<br/>
+                    RX: ${formatTraffic(stats.total.data.sumrx, params.unit)}<br/>
+                    Total: ${formatTraffic(Number(stats.total.data.sumtx || 0) + Number(stats.total.data.sumrx || 0), params.unit)}
+                </div>
+                
+                <button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>
+                <hr/>
+            `;
+            
+            appContainer.innerHTML = html;
+
+            // Event Listeners
+            document.getElementById('unitSelector').addEventListener('change', (e) => setParams({unit: e.target.value}));
+            document.getElementById('windowSelector').addEventListener('change', (e) => setParams({window: parseInt(e.target.value), offset: 0}));
+            document.getElementById('olderBtn').addEventListener('click', () => setParams({offset: params.offset + 1}));
+            if (document.getElementById('currentBtn')) {
+                document.getElementById('currentBtn').addEventListener('click', () => setParams({offset: 0}));
+            }
+            if (document.getElementById('newerBtn')) {
+                document.getElementById('newerBtn').addEventListener('click', () => setParams({offset: params.offset - 1}));
+            }
+
+            // Draw Chart
+            if (google.visualization && google.visualization.Dashboard) {
+                drawChart(data, params.unit, windowData);
+            } else {
+                google.charts.setOnLoadCallback(() => drawChart(data, params.unit, windowData));
             }
         }
 
@@ -296,11 +293,14 @@
             dataTable.addColumn('number', `RX (${unit})`);
 
             apiData.chartData.forEach(row => {
-                dataTable.addRow([
-                    new Date(row.hour.replace(' ', 'T')),
-                    parseFloat((row.tx / divisor).toFixed(2)),
-                    parseFloat((row.rx / divisor).toFixed(2))
-                ]);
+                const dt = new Date(row.hour.replace(' ', 'T'));
+                if (!isNaN(dt.getTime())) {
+                    dataTable.addRow([
+                        dt,
+                        parseFloat((row.tx / divisor).toFixed(2)),
+                        parseFloat((row.rx / divisor).toFixed(2))
+                    ]);
+                }
             });
 
             const dashboard = new google.visualization.Dashboard(document.getElementById('dashboard_div'));
@@ -362,9 +362,6 @@
             dashboard.bind(rangeSlider, chartWrapper);
             dashboard.draw(dataTable);
         }
-
-        // Handle back/forward navigation
-        window.onpopstate = render;
 
         // Initial render
         render();
