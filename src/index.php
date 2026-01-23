@@ -178,6 +178,30 @@
             const stats = data.stats;
             const windowData = data.window;
 
+            const units = ['MB', 'GB', 'TB', 'PB', 'EB'];
+            const nextUnit = units[units.indexOf(params.unit) + 1] || null;
+
+            const renderStats = (statData) => {
+                const tx = statData.sumtx || 0;
+                const rx = statData.sumrx || 0;
+                const total = Number(tx) + Number(rx);
+                return `
+                    <div style="display: flex; gap: 20px;">
+                        <div style="flex: 1;">
+                            TX: ${formatTraffic(tx, params.unit)}<br/>
+                            RX: ${formatTraffic(rx, params.unit)}<br/>
+                            Total: ${formatTraffic(total, params.unit)}
+                        </div>
+                        ${nextUnit ? `
+                        <div style="flex: 1; border-left: 1px solid #eee; padding-left: 10px;">
+                            TX: ${formatTraffic(tx, nextUnit)}<br/>
+                            RX: ${formatTraffic(rx, nextUnit)}<br/>
+                            Total: ${formatTraffic(total, nextUnit)}
+                        </div>` : ''}
+                    </div>
+                `;
+            };
+
             let html = `
                 <div class="card">
                     <div class='card-title'>Device Information</div>
@@ -226,31 +250,23 @@
                     <div class="card" style="flex: 1;">
                         <div class='card-title'>Daily Stats</div>
                         From: ${stats.daily.range.from} to ${stats.daily.range.to}<br/>
-                        TX: ${formatTraffic(stats.daily.data.sumtx, params.unit)}<br/>
-                        RX: ${formatTraffic(stats.daily.data.sumrx, params.unit)}<br/>
-                        Total: ${formatTraffic(Number(stats.daily.data.sumtx || 0) + Number(stats.daily.data.sumrx || 0), params.unit)}
+                        ${renderStats(stats.daily.data)}
                     </div>
                     <div class="card" style="flex: 1;">
                         <div class='card-title'>Weekly Stats</div>
                         From: ${stats.weekly.range.from} to ${stats.weekly.range.to}<br/>
-                        TX: ${formatTraffic(stats.weekly.data.sumtx, params.unit)}<br/>
-                        RX: ${formatTraffic(stats.weekly.data.sumrx, params.unit)}<br/>
-                        Total: ${formatTraffic(Number(stats.weekly.data.sumtx || 0) + Number(stats.weekly.data.sumrx || 0), params.unit)}
+                        ${renderStats(stats.weekly.data)}
                     </div>
                     <div class="card" style="flex: 1;">
                         <div class='card-title'>Monthly Stats</div>
                         From: ${stats.monthly.range.from} to ${stats.monthly.range.to}<br/>
-                        TX: ${formatTraffic(stats.monthly.data.sumtx, params.unit)}<br/>
-                        RX: ${formatTraffic(stats.monthly.data.sumrx, params.unit)}<br/>
-                        Total: ${formatTraffic(Number(stats.monthly.data.sumtx || 0) + Number(stats.monthly.data.sumrx || 0), params.unit)}
+                        ${renderStats(stats.monthly.data)}
                     </div>
                 </div>
 
                 <div class="card">
                     <div class='card-title'>Total Stats</div>
-                    TX: ${formatTraffic(stats.total.data.sumtx, params.unit)}<br/>
-                    RX: ${formatTraffic(stats.total.data.sumrx, params.unit)}<br/>
-                    Total: ${formatTraffic(Number(stats.total.data.sumtx || 0) + Number(stats.total.data.sumrx || 0), params.unit)}
+                    ${renderStats(stats.total.data)}
                 </div>
                 
                 <button onclick="setParams({id: null, window: null, offset: null, unit: null})">Back to list</button>
