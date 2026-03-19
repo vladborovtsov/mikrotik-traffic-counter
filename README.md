@@ -20,7 +20,7 @@ Key paths:
 
 - `public/index.php` SPA shell
 - `public/api.php` JSON API entrypoint
-- `public/collector.php` plain-text collector shim for MikroTik scripts
+- `public/collect/index.php` collector endpoint behind `/collect`
 - `public/assets/app.js` async frontend logic
 - `public/assets/app.css` frontend styles
 - `src/` application code: config, database, HTTP, controllers, models, services, support
@@ -28,7 +28,7 @@ Key paths:
 - `scripts/export-legacy-sqlite.php` legacy SQLite exporter
 - `scripts/import-legacy-json.php` legacy JSON importer
 
-Compatibility wrappers still exist in `src/index.php`, `src/api.php`, and `src/collector.php`, but they are only shims and not the intended deployment entrypoints.
+Compatibility wrappers still exist in `src/index.php` and `src/api.php`, but they are only shims and not the intended deployment entrypoints.
 
 ## Requirements
 
@@ -79,12 +79,6 @@ Then open:
 http://127.0.0.1:8080
 ```
 
-Collector endpoint in local mode:
-
-```text
-http://127.0.0.1:8080/collector.php
-```
-
 ## Docker
 
 The Docker setup is aligned with PHP 8.3 and mounts the whole repository so the root-level configuration files are available in the container.
@@ -117,18 +111,67 @@ DB_MYSQL_PASSWORD=secret
 The nginx container serves `public/` as the document root. It also:
 
 - denies access to `.env`, `.git`, and database files
-- rate-limits `/collector.php`
 - adds a few baseline security headers
+
+## Release Build
+
+If you deploy with FTP, SCP, or `rsync`, it is easier to build a clean release directory first instead of uploading the whole repository.
+
+Prepare production dependencies:
+
+```bash
+composer install --no-dev --optimize-autoloader
+```
+
+Build a release directory:
+
+```bash
+bash scripts/build-release.sh
+```
+
+Or do both in one step:
+
+```bash
+bash scripts/build-release.sh --composer-install
+```
+
+This creates:
+
+```text
+build/release
+```
+
+The release build keeps runtime files such as:
+
+- `public/`
+- `src/`
+- `vendor/`
+- `configuration.php`
+- `.env.example`
+- `var/`
+
+It excludes development-only or local-only content such as:
+
+- `.git/`
+- `tests/`
+- `docker/`
+- `mysql_data/`
+- local `var/` contents
+- docs and screenshots
+
+After building the release:
+
+1. copy your real `.env` into `build/release`
+2. upload `build/release`
+3. configure the web server document root to `public/`
 
 ## Collector Endpoint
 
 Collector ingestion is implemented in:
 
 ```text
-/api.php?action=collect
+/collect
 ```
-
-`/collector.php` is the simple plain-text collector shim for MikroTik scripts.
 
 Required query parameters:
 
@@ -145,10 +188,10 @@ Optional query parameters:
 Example collector request:
 
 ```text
-http://<server>/collector.php?sn=ABC123456789&interface=ether1&tx=1000&rx=2000&delta=true
+http://<server>/collect?sn=ABC123456789&interface=ether1&tx=1000&rx=2000&delta=true
 ```
 
-Equivalent direct API request:
+Fallback direct API request:
 
 ```text
 http://<server>/api.php?action=collect&sn=ABC123456789&interface=ether1&tx=1000&rx=2000&delta=true
@@ -161,7 +204,7 @@ http://<server>/api.php?action=collect&sn=ABC123456789&interface=ether1&tx=1000&
 :local iface "ether3"
 :local txbytes ([/interface get [find name=$iface] tx-byte])
 :local rxbytes ([/interface get [find name=$iface] rx-byte])
-/tool fetch url=("http://<server>/collector.php\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true") mode=http keep-result=no
+/tool fetch url=("http://<server>/collect\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true") mode=http keep-result=no
 :log info ("Traffic data sent for $iface, tx $txbytes, rx $rxbytes")
 ```
 
@@ -173,7 +216,7 @@ With auth enabled:
 :local txbytes ([/interface get [find name=$iface] tx-byte])
 :local rxbytes ([/interface get [find name=$iface] rx-byte])
 :local token "replace_me"
-/tool fetch url=("http://<server>/collector.php\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true&auth=$token") mode=http keep-result=no
+/tool fetch url=("http://<server>/collect\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true&auth=$token") mode=http keep-result=no
 ```
 
 Scheduler example:
@@ -333,13 +376,13 @@ Recommended validation before production use:
 - run the full stack end-to-end in Docker
 - review the UI in a real browser
 - verify MySQL-backed tests end-to-end in an environment with MySQL available
-- send real MikroTik collector requests against `/collector.php`
+- send real MikroTik collector requests against `/collect`
 
 ## Suggested Full-Stack Validation
 
 1. Start SQLite mode with `docker compose up --build`.
 2. Open `http://127.0.0.1/` and verify the UI loads.
-3. Send a few collector requests to `/collector.php` with different interface names for the same serial number.
+3. Send a few collector requests to `/collect` with different interface names for the same serial number.
 4. Verify:
    - the device appears in the list
    - per-interface selection works

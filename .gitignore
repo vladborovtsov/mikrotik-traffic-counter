@@ -10,6 +10,7 @@
 /var/*
 !/var/.gitignore
 /mysql_data/
+/build/
 
 # macOS
 .DS_Store
