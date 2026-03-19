@@ -7,7 +7,7 @@ declare(strict_types=1);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mikrotik Traffic Counter</title>
-    <link rel="stylesheet" href="/assets/app.css">
+    <link rel="stylesheet" href="assets/app.css">
     <script src="https://www.gstatic.com/charts/loader.js"></script>
     <script>
         google.charts.load('current', { packages: ['corechart', 'controls'] });
@@ -26,6 +26,6 @@ declare(strict_types=1);
             <div class="loading">Loading...</div>
         </div>
     </div>
-    <script src="/assets/app.js"></script>
+    <script src="assets/app.js"></script>
 </body>
 </html>

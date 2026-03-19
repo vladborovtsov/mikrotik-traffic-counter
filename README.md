@@ -30,6 +30,8 @@ Key paths:
 
 Compatibility wrappers still exist in `src/index.php` and `src/api.php`, but they are only shims and not the intended deployment entrypoints.
 
+The UI is written to work both at the web root and under a subfolder deployment, as long as the web server points that subfolder at `public/`.
+
 ## Requirements
 
 - PHP 8.3+
@@ -77,6 +79,12 @@ Then open:
 
 ```text
 http://127.0.0.1:8080
+```
+
+Subfolder deployments are also supported, for example:
+
+```text
+https://example.com/mikrotik/
 ```
 
 ## Docker
@@ -164,6 +172,8 @@ After building the release:
 1. copy your real `.env` into `build/release`
 2. upload `build/release`
 3. configure the web server document root to `public/`
+
+If deploying under a subfolder instead of the domain root, point that subfolder to `public/`. Relative asset and API URLs are intended to work in both cases.
 
 ## Collector Endpoint
 
