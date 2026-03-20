@@ -457,6 +457,8 @@ function drawChart(chartData, windowInfo, unit) {
             options: {
                 legend: { position: 'top' },
                 height: 380,
+                pointSize: 5,
+                lineWidth: 2,
                 chartArea: { left: 60, right: 20, top: 48, bottom: 60 },
                 colors: ['#1f7a55', '#14513a'],
                 hAxis: {

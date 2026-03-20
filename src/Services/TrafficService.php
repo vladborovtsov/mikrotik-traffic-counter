@@ -36,6 +36,8 @@ final class TrafficService
         bool $useDelta,
         ?string $sourceIp = null
     ): TrafficSample {
+        // Intentional behavior: the first-ever sample for an interface counts as traffic.
+        // It represents accumulated usage before monitoring started, so delta begins at raw_*.
         $deltaTx = $rawTx;
         $deltaRx = $rawRx;
         $lastSample = $this->getLatestSampleForInterface($interfaceId);

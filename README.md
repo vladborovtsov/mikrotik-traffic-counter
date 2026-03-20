@@ -222,6 +222,11 @@ Fallback direct API request:
 http://<server>/api.php?action=collect&sn=ABC123456789&interface=ether1&tx=1000&rx=2000&delta=true
 ```
 
+Delta behavior note:
+- when `delta=true`, a sample whose counters increased is stored as the difference from the previous sample
+- when counters decreased, the device is treated as reset/wrapped and that sample contributes `0` delta while establishing a new baseline
+- the first-ever sample on a brand new interface intentionally counts as traffic in full, because it represents accumulated usage before monitoring began
+
 ## MikroTik Example
 
 ```routeros
@@ -308,78 +313,17 @@ If the `TEST_MYSQL_*` variables are not configured, the MySQL integration test i
 
 ## Legacy Migration
 
-v2 does not reuse the legacy schema in place.  
-Export the legacy SQLite file first, then import or transform the JSON into the new environment.
+Detailed migration instructions now live next to the migration scripts:
 
-Export command:
+- [MIGRATION.md](/workspace/mikrotik-traffic-counter/scripts/MIGRATION.md)
 
-```bash
-php scripts/export-legacy-sqlite.php src/tikstats.sqlite /tmp/legacy-export.json legacy
-```
+That document covers:
 
-Arguments:
-
-1. legacy SQLite path
-2. output JSON path
-3. optional interface name for imported legacy samples, defaults to `legacy`
-
-The export contains:
-
-- `devices`
-- `interfaces`
-- `traffic_samples`
-
-Legacy traffic rows are exported as delta-only samples because the old schema does not retain raw counters.
-
-Import the exported JSON into a fresh v2 database with your normal `.env` / environment configuration:
-
-```bash
-php scripts/import-legacy-json.php /tmp/legacy-export.json
-```
-
-Docker-oriented examples:
-
-Export from inside the PHP container:
-
-```bash
-docker compose run --rm php php scripts/export-legacy-sqlite.php src/tikstats.sqlite /tmp/legacy-export.json legacy
-```
-
-Copy the export out if needed:
-
-```bash
-docker compose run --rm php sh -lc 'cp /tmp/legacy-export.json var/legacy-export.json'
-```
-
-Import into a fresh SQLite-backed v2 database in Docker:
-
-```bash
-docker compose run --rm php php scripts/import-legacy-json.php /tmp/legacy-export.json
-```
-
-Import into a MySQL-backed v2 database in Docker:
-
-```bash
-docker compose --profile mysql run --rm \
-  -e DB_DRIVER=mysql \
-  -e DB_MYSQL_HOST=mysql \
-  -e DB_MYSQL_PORT=3306 \
-  -e DB_MYSQL_DATABASE=tikstats \
-  -e DB_MYSQL_USERNAME=tikstats \
-  -e DB_MYSQL_PASSWORD=secret \
-  php php scripts/import-legacy-json.php /tmp/legacy-export.json
-```
-
-The importer:
-
-- creates or updates devices by serial number
-- creates interfaces by `(device, interface name)`
-- imports legacy traffic rows as explicit delta samples
-- adds a synthetic zero-delta snapshot when legacy `last_tx` / `last_rx` are available so the v2 UI can show sensible last-counter values
-
-The runtime application itself does not read the legacy schema. Migration is intentionally out-of-band.
-
-After import, older traffic may not appear in the default chart immediately if it falls outside `DEFAULT_WINDOW_HOURS`. Device totals and interface data will still be present; use a larger `window` or page further back with `offset`.
+- legacy export
+- fresh v2 import
+- interactive mapping file preparation
+- Docker-based migration commands
+- merging legacy pseudo-devices into real device/interface targets
 
 ## Current Status
 

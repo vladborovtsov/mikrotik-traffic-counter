@@ -6,6 +6,7 @@ namespace App\Services;
 
 use PDO;
 use RuntimeException;
+use App\Support\LegacyImportRollbackManifest;
 
 final class LegacyImportService
 {
@@ -36,7 +37,9 @@ final class LegacyImportService
         private readonly PDO $db,
         private readonly DeviceService $deviceService,
         private readonly InterfaceService $interfaceService,
-        private readonly TrafficService $trafficService
+        private readonly TrafficService $trafficService,
+        private readonly ?LegacyImportMappingService $mappingService = null,
+        private readonly ?LegacyImportRollbackManifest $rollbackManifest = null
     ) {
     }
 
@@ -93,6 +96,8 @@ final class LegacyImportService
      */
     public function importDeviceRow(array $deviceRow): void
     {
+        $legacySerial = trim((string) ($deviceRow['serial_number'] ?? ''));
+        $deviceRow = $this->mappingService?->mapDeviceRow($deviceRow) ?? $deviceRow;
         $serial = trim((string) ($deviceRow['serial_number'] ?? ''));
         if ($serial === '') {
             return;
@@ -113,8 +118,21 @@ final class LegacyImportService
             'last_seen_at' => $timestamp,
         ], $timestamp) ?? $device;
 
+        $snapshotTarget = $this->mappingService?->mapSnapshotTarget($legacySerial !== '' ? $legacySerial : $serial) ?? [
+            'skip' => false,
+            'serial_number' => $serial,
+            'interface_name' => 'legacy',
+        ];
+        if (($snapshotTarget['skip'] ?? false) === true) {
+            $this->counts['devices']++;
+            return;
+        }
+
         $this->deviceBySerial[$serial] = $device;
-        $this->deviceSnapshotTargets[$serial] = [
+        $this->deviceSnapshotTargets[$this->makeInterfaceKey(
+            $snapshotTarget['serial_number'],
+            $snapshotTarget['interface_name']
+        )] = [
             'last_seen_at' => $timestamp,
             'last_tx' => $this->nullableInt($deviceRow['last_tx'] ?? null),
             'last_rx' => $this->nullableInt($deviceRow['last_rx'] ?? null),
@@ -127,6 +145,7 @@ final class LegacyImportService
      */
     public function importInterfaceRow(array $interfaceRow): void
     {
+        $interfaceRow = $this->mappingService?->mapInterfaceRow($interfaceRow) ?? $interfaceRow;
         $serial = trim((string) ($interfaceRow['serial_number'] ?? ''));
         $name = trim((string) ($interfaceRow['name'] ?? ''));
         if ($serial === '' || $name === '' || !isset($this->deviceBySerial[$serial])) {
@@ -159,6 +178,7 @@ final class LegacyImportService
      */
     public function importTrafficRow(array $sampleRow): void
     {
+        $sampleRow = $this->mappingService?->mapTrafficRow($sampleRow) ?? $sampleRow;
         $serial = trim((string) ($sampleRow['serial_number'] ?? ''));
         $interfaceName = trim((string) ($sampleRow['interface_name'] ?? ''));
         if ($serial === '' || $interfaceName === '') {
@@ -177,17 +197,26 @@ final class LegacyImportService
         $deltaRx = max(0, (int) ($sampleRow['delta_rx'] ?? 0));
         $rawTx = $this->nullableInt($sampleRow['raw_tx'] ?? null);
         $rawRx = $this->nullableInt($sampleRow['raw_rx'] ?? null);
+        $previousRawTx = $this->currentRaw[$key]['tx'] ?? null;
+        $previousRawRx = $this->currentRaw[$key]['rx'] ?? null;
 
         if ($rawTx === null) {
-            $rawTx = ($this->currentRaw[$key]['tx'] ?? 0) + $deltaTx;
+            $rawTx = ($previousRawTx ?? 0) + $deltaTx;
         }
         if ($rawRx === null) {
-            $rawRx = ($this->currentRaw[$key]['rx'] ?? 0) + $deltaRx;
+            $rawRx = ($previousRawRx ?? 0) + $deltaRx;
+        }
+
+        if ($previousRawTx !== null && $rawTx < $previousRawTx) {
+            $deltaTx = 0;
+        }
+        if ($previousRawRx !== null && $rawRx < $previousRawRx) {
+            $deltaRx = 0;
         }
 
         $recordedAt = $this->normalizeTimestamp($sampleRow['recorded_at'] ?? null);
 
-        $this->trafficService->importSample(
+        $sample = $this->trafficService->importSample(
             $device->id,
             $interface->id,
             $rawTx,
@@ -196,6 +225,7 @@ final class LegacyImportService
             $deltaRx,
             $recordedAt
         );
+        $this->rollbackManifest?->recordTrafficSampleId($sample->id);
 
         $this->currentRaw[$key] = ['tx' => $rawTx, 'rx' => $rawRx];
         $this->lastRecordedAt[$key] = $recordedAt;
@@ -207,18 +237,17 @@ final class LegacyImportService
      */
     public function finishImport(): array
     {
-        foreach ($this->deviceSnapshotTargets as $serial => $snapshot) {
-            $device = $this->deviceBySerial[$serial] ?? null;
-            if ($device === null) {
-                continue;
-            }
-
-            $interface = $this->findFirstInterfaceForSerial($serial, $this->interfaceByKey);
+        foreach ($this->deviceSnapshotTargets as $key => $snapshot) {
+            $interface = $this->interfaceByKey[$key] ?? null;
             if ($interface === null) {
                 continue;
             }
 
-            $key = $this->makeInterfaceKey($serial, $interface->name);
+            $device = $this->deviceBySerial[$this->serialFromInterfaceKey($key)] ?? null;
+            if ($device === null) {
+                continue;
+            }
+
             $snapshotTx = $snapshot['last_tx'];
             $snapshotRx = $snapshot['last_rx'];
 
@@ -231,13 +260,6 @@ final class LegacyImportService
             $targetTx = $snapshotTx ?? $currentTx ?? 0;
             $targetRx = $snapshotRx ?? $currentRx ?? 0;
 
-            if ($currentTx !== null && $targetTx < $currentTx) {
-                $targetTx = $currentTx;
-            }
-            if ($currentRx !== null && $targetRx < $currentRx) {
-                $targetRx = $currentRx;
-            }
-
             if ($currentTx === $targetTx && $currentRx === $targetRx) {
                 continue;
             }
@@ -247,7 +269,7 @@ final class LegacyImportService
                 $recordedAt = $this->lastRecordedAt[$key];
             }
 
-            $this->trafficService->importSample(
+            $sample = $this->trafficService->importSample(
                 $device->id,
                 $interface->id,
                 $targetTx,
@@ -256,11 +278,13 @@ final class LegacyImportService
                 0,
                 $recordedAt
             );
+            $this->rollbackManifest?->recordTrafficSampleId($sample->id);
 
             $this->counts['synthetic_snapshots']++;
         }
 
         $this->db->commit();
+        $this->rollbackManifest?->write();
 
         return $this->counts;
     }
@@ -272,23 +296,16 @@ final class LegacyImportService
         }
     }
 
-    /**
-     * @param array<string, \App\Models\InterfaceModel> $interfaceByKey
-     */
-    private function findFirstInterfaceForSerial(string $serial, array $interfaceByKey): ?\App\Models\InterfaceModel
-    {
-        foreach ($interfaceByKey as $key => $interface) {
-            if (str_starts_with($key, $serial . '::')) {
-                return $interface;
-            }
-        }
-
-        return null;
-    }
-
     private function makeInterfaceKey(string $serial, string $name): string
     {
         return $serial . '::' . $name;
+    }
+
+    private function serialFromInterfaceKey(string $key): string
+    {
+        $parts = explode('::', $key, 2);
+
+        return $parts[0] ?? '';
     }
 
     private function normalizeTimestamp(mixed $value): string
