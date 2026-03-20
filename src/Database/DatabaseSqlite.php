@@ -19,6 +19,21 @@ final class DatabaseSqlite extends Database
         return sprintf("strftime('%%Y-%%m-%%d %%H:00:00', %s)", $column);
     }
 
+    public function bucketExpression(string $column, int $minutes): string
+    {
+        if ($minutes <= 60 && 60 % $minutes === 0) {
+            return sprintf(
+                "strftime('%%Y-%%m-%%d %%H:%%M:00', datetime(%s, printf('-%d minutes', CAST(strftime('%%M', %s) AS INTEGER) %% %d), 'utc'))",
+                $column,
+                $minutes,
+                $column,
+                $minutes
+            );
+        }
+
+        return $this->hourlyBucketExpression($column);
+    }
+
     public function initializeSchema(): void
     {
         if ($this->tableExists('devices') && !$this->columnExists('devices', 'serial_number')) {
@@ -35,11 +50,21 @@ final class DatabaseSqlite extends Database
             serial_number TEXT NOT NULL,
             name TEXT NULL,
             comment TEXT NULL,
+            home_scope TEXT NOT NULL DEFAULT \'all\',
+            home_interface_id INTEGER NULL,
             last_seen_at DATETIME NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             UNIQUE(serial_number)
         )');
+
+        if (!$this->columnExists('devices', 'home_scope')) {
+            $this->pdo()->exec("ALTER TABLE devices ADD COLUMN home_scope TEXT NOT NULL DEFAULT 'all'");
+        }
+
+        if (!$this->columnExists('devices', 'home_interface_id')) {
+            $this->pdo()->exec('ALTER TABLE devices ADD COLUMN home_interface_id INTEGER NULL');
+        }
 
         $this->pdo()->exec('CREATE TABLE IF NOT EXISTS interfaces (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,

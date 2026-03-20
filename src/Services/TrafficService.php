@@ -122,8 +122,17 @@ final class TrafficService
     /**
      * @return array{last_tx: float, last_rx: float}
      */
-    public function getDeviceLastCounters(int $deviceId): array
+    public function getDeviceLastCounters(int $deviceId, ?int $interfaceId = null): array
     {
+        if ($interfaceId !== null) {
+            $sample = $this->getLatestSampleForInterface($interfaceId);
+
+            return [
+                'last_tx' => $sample?->rawTx ?? 0.0,
+                'last_rx' => $sample?->rawRx ?? 0.0,
+            ];
+        }
+
         $stmt = $this->db->prepare('SELECT
                 COALESCE(SUM(samples.raw_tx), 0) AS last_tx,
                 COALESCE(SUM(samples.raw_rx), 0) AS last_rx
@@ -154,7 +163,23 @@ final class TrafficService
      */
     public function getChartData(int $deviceId, string $start, string $end, ?int $interfaceId = null): array
     {
-        $bucketExpression = $this->database->hourlyBucketExpression('recorded_at');
+        return $this->getChartDataForBucketMinutes($deviceId, $start, $end, 60, $interfaceId);
+    }
+
+    /**
+     * @return array<int, array{hour: string, tx: float, rx: float}>
+     */
+    public function getChartDataForBucketMinutes(
+        int $deviceId,
+        string $start,
+        string $end,
+        int $bucketMinutes,
+        ?int $interfaceId = null
+    ): array
+    {
+        $bucketExpression = $bucketMinutes === 60
+            ? $this->database->hourlyBucketExpression('recorded_at')
+            : $this->database->bucketExpression('recorded_at', $bucketMinutes);
         $sql = "SELECT {$bucketExpression} AS hour, SUM(delta_tx) AS tx, SUM(delta_rx) AS rx
             FROM traffic_samples
             WHERE device_id = :device_id AND recorded_at >= :start AND recorded_at <= :end";

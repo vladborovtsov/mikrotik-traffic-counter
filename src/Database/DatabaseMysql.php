@@ -20,6 +20,20 @@ final class DatabaseMysql extends Database
         return sprintf("DATE_FORMAT(%s, '%%Y-%%m-%%d %%H:00:00')", $column);
     }
 
+    public function bucketExpression(string $column, int $minutes): string
+    {
+        if ($minutes <= 60 && 60 % $minutes === 0) {
+            return sprintf(
+                "DATE_FORMAT(DATE_SUB(%s, INTERVAL (MINUTE(%s) %% %d) MINUTE), '%%Y-%%m-%%d %%H:%%i:00')",
+                $column,
+                $column,
+                $minutes
+            );
+        }
+
+        return $this->hourlyBucketExpression($column);
+    }
+
     public function initializeSchema(): void
     {
         if ($this->tableExists('devices') && !$this->columnExists('devices', 'serial_number')) {
@@ -36,11 +50,21 @@ final class DatabaseMysql extends Database
             serial_number VARCHAR(191) NOT NULL,
             name VARCHAR(255) NULL,
             comment VARCHAR(255) NULL,
+            home_scope VARCHAR(32) NOT NULL DEFAULT \'all\',
+            home_interface_id INT NULL,
             last_seen_at DATETIME NULL,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL,
             UNIQUE KEY uniq_devices_serial_number (serial_number)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        if (!$this->columnExists('devices', 'home_scope')) {
+            $this->pdo()->exec("ALTER TABLE devices ADD COLUMN home_scope VARCHAR(32) NOT NULL DEFAULT 'all' AFTER comment");
+        }
+
+        if (!$this->columnExists('devices', 'home_interface_id')) {
+            $this->pdo()->exec('ALTER TABLE devices ADD COLUMN home_interface_id INT NULL AFTER home_scope');
+        }
 
         $this->pdo()->exec('CREATE TABLE IF NOT EXISTS interfaces (
             id INT AUTO_INCREMENT PRIMARY KEY,

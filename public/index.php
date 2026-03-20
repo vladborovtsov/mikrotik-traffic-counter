@@ -20,7 +20,6 @@ declare(strict_types=1);
                 <h1>Mikrotik Traffic Counter</h1>
                 <p>Async interface-aware traffic monitoring with device summaries, per-interface views, and in-place navigation.</p>
             </div>
-            <div class="badge">v2 async client</div>
         </div>
         <div id="app" class="app-grid">
             <div class="loading">Loading...</div>

@@ -53,18 +53,6 @@ body {
     font-size: 1rem;
 }
 
-.badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-radius: 999px;
-    background: var(--accent-soft);
-    color: var(--accent-strong);
-    font-size: 0.9rem;
-    white-space: nowrap;
-}
-
 .app-grid {
     display: grid;
     gap: 18px;
@@ -112,6 +100,13 @@ body {
     background: linear-gradient(180deg, #ffffff 0%, #f8fbf8 100%);
 }
 
+.device-list-grid {
+    display: grid;
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+    gap: 14px;
+    align-items: stretch;
+}
+
 .device-item-head {
     display: flex;
     justify-content: space-between;
@@ -134,6 +129,37 @@ body {
 .meta {
     color: var(--muted);
     font-size: 0.95rem;
+}
+
+.mini-window-switch {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.mini-window-switch-inline {
+    margin-top: 0;
+    gap: 6px;
+}
+
+.mini-window-switch button {
+    padding: 8px 11px;
+    border-radius: 999px;
+    background: #f3f7f4;
+    border-color: var(--line);
+    color: var(--muted);
+}
+
+.mini-window-switch button.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-color: #b7d9c8;
+}
+
+.mini-window-switch-inline button {
+    padding: 5px 8px;
+    font-size: 0.8rem;
 }
 
 .toolbar {
@@ -264,6 +290,164 @@ button:hover {
     border: 1px solid var(--line);
 }
 
+.traffic-combined {
+    display: grid;
+    gap: 8px;
+    align-content: start;
+}
+
+.traffic-pair {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 6px;
+    border-top: 1px solid #dde6e0;
+}
+
+.traffic-pair:first-of-type {
+    border-top: none;
+    padding-top: 0;
+}
+
+.traffic-pair span:first-child {
+    color: var(--muted);
+}
+
+.mini-chart-card {
+    display: grid;
+    gap: 8px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #fafdff 0%, #f3f7f4 100%);
+    border: 1px solid var(--line);
+}
+
+.mini-chart-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.mini-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.mini-scope-switch {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.mini-scope-switch button {
+    padding: 5px 8px;
+    border-radius: 999px;
+    background: #f3f7f4;
+    border-color: var(--line);
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.mini-scope-switch button.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border-color: #b7d9c8;
+}
+
+.mini-interface-select {
+    width: auto;
+    min-width: 130px;
+    padding: 6px 8px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+}
+
+.mini-chart-caption {
+    font-size: 0.86rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mini-chart {
+    min-height: 120px;
+    display: grid;
+    align-items: center;
+    position: relative;
+}
+
+.sparkline-svg {
+    width: 100%;
+    height: 98px;
+    overflow: visible;
+}
+
+.sparkline-hit {
+    cursor: pointer;
+}
+
+.sparkline-tooltip {
+    position: absolute;
+    z-index: 2;
+    min-width: 150px;
+    max-width: 220px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(22, 34, 27, 0.94);
+    color: #f7faf8;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    pointer-events: none;
+    box-shadow: 0 12px 30px rgba(9, 18, 13, 0.22);
+    transform: translateY(-100%);
+}
+
+.sparkline-tooltip-line.tx {
+    color: #9fc4ff;
+}
+
+.sparkline-tooltip-line.rx {
+    color: #ffb3bf;
+}
+
+.sparkline-legend {
+    display: flex;
+    gap: 14px;
+    font-size: 0.82rem;
+    color: var(--muted);
+}
+
+.sparkline-scale {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.sparkline-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.swatch.tx {
+    background: #1b63d8;
+}
+
+.swatch.rx {
+    background: #c63b4f;
+}
+
 .summary-tile strong {
     display: block;
     margin-bottom: 6px;
@@ -307,6 +491,15 @@ button:hover {
     .split,
     .stats-grid {
         grid-template-columns: 1fr;
+    }
+
+    .device-list-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .mini-chart-head {
+        flex-direction: column;
+        align-items: start;
     }
 
     .hero {

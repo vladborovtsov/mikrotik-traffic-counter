@@ -72,7 +72,7 @@ final class DeviceService
     }
 
     /**
-     * @param array{name?: ?string, comment?: ?string, last_seen_at?: ?string} $fields
+     * @param array{name?: ?string, comment?: ?string, home_scope?: ?string, home_interface_id?: ?int, last_seen_at?: ?string} $fields
      */
     public function updateDevice(int $id, array $fields, string $timestamp): ?Device
     {
@@ -87,6 +87,16 @@ final class DeviceService
         if (array_key_exists('comment', $fields)) {
             $assignments[] = 'comment = :comment';
             $params[':comment'] = $fields['comment'];
+        }
+
+        if (array_key_exists('home_scope', $fields)) {
+            $assignments[] = 'home_scope = :home_scope';
+            $params[':home_scope'] = $fields['home_scope'];
+        }
+
+        if (array_key_exists('home_interface_id', $fields)) {
+            $assignments[] = 'home_interface_id = :home_interface_id';
+            $params[':home_interface_id'] = $fields['home_interface_id'];
         }
 
         if (array_key_exists('last_seen_at', $fields)) {
