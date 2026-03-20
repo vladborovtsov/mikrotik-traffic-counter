@@ -169,7 +169,7 @@ This creates:
 build/release
 ```
 
-The release build keeps runtime files such as:
+The release build copies only the runtime payload:
 
 - `public/`
 - `src/`
@@ -178,15 +178,9 @@ The release build keeps runtime files such as:
 - `.env.example`
 - `.env.production.example`
 - `var/`
+- `LICENSE` if present
 
-It excludes development-only or local-only content such as:
-
-- `.git/`
-- `tests/`
-- `docker/`
-- `mysql_data/`
-- local `var/` contents
-- docs and screenshots
+It does not copy development-only or local-only content such as tests, Docker files, local `.env`, screenshots, or repository metadata.
 
 After building the release:
 
