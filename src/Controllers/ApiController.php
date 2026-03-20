@@ -9,6 +9,7 @@ use App\Http\Request;
 use App\Http\Response;
 use App\Models\Device;
 use App\Services\DeviceService;
+use App\Services\GlobalSettingsService;
 use App\Services\InterfaceService;
 use App\Services\RequestGuardService;
 use App\Services\TrafficService;
@@ -20,6 +21,7 @@ final class ApiController
         private readonly Request $request,
         private readonly Configuration $config,
         private readonly DeviceService $deviceService,
+        private readonly GlobalSettingsService $globalSettingsService,
         private readonly InterfaceService $interfaceService,
         private readonly TrafficService $trafficService,
         private readonly RequestGuardService $requestGuard
@@ -31,10 +33,13 @@ final class ApiController
         return match ($this->request->action()) {
             'collect' => $this->collect(),
             'listDevices', 'getDevices' => $this->listDevices(),
+            'getGlobalSettings' => $this->getGlobalSettings(),
+            'updateGlobalSettings' => $this->updateGlobalSettings(),
             'getDeviceOverview' => $this->getDeviceOverview(),
             'getDeviceSettings' => $this->getDeviceSettings(),
             'getDevice', 'getDeviceData' => $this->getDeviceData(),
             'listInterfaces' => $this->listInterfaces(),
+            'moveDevice' => $this->moveDevice(),
             'renameDevice' => $this->renameDevice(),
             'updateDevice' => $this->updateDevice(),
             'deleteDevice' => $this->deleteDevice(),
@@ -124,6 +129,27 @@ final class ApiController
         );
 
         return Response::json($devices);
+    }
+
+    private function getGlobalSettings(): Response
+    {
+        return Response::json($this->globalSettingsService->getSettings());
+    }
+
+    private function updateGlobalSettings(): Response
+    {
+        if (!$this->request->hasQuery('theme_mode')) {
+            return Response::json(['error' => 'Missing theme_mode'], 400);
+        }
+
+        $themeMode = strtolower(trim((string) $this->request->query('theme_mode')));
+        if (!in_array($themeMode, ['light', 'dark', 'auto'], true)) {
+            return Response::json(['error' => 'Invalid theme_mode'], 400);
+        }
+
+        $this->globalSettingsService->set('theme_mode', $themeMode);
+
+        return Response::json($this->globalSettingsService->getSettings());
     }
 
     private function getDeviceData(): Response
@@ -358,6 +384,23 @@ final class ApiController
         return Response::json(['status' => 'deleted']);
     }
 
+    private function moveDevice(): Response
+    {
+        $id = $this->request->intQuery('id');
+        $direction = strtolower(trim((string) $this->request->query('direction', '')));
+
+        if ($id === null || $id < 1 || !in_array($direction, ['up', 'down'], true)) {
+            return Response::json(['error' => 'Invalid input'], 400);
+        }
+
+        $device = $this->deviceService->moveDevice($id, $direction, date('Y-m-d H:i:s'));
+        if ($device === null) {
+            return Response::json(['error' => 'Device not found'], 404);
+        }
+
+        return Response::json($this->presentDevice($device));
+    }
+
     private function getValidatedWindowHours(): int
     {
         $window = $this->request->intQuery('window') ?? $this->config->getInt('DEFAULT_WINDOW_HOURS', 48);
@@ -419,6 +462,7 @@ final class ApiController
             'sn' => $device->serialNumber,
             'name' => $device->name,
             'comment' => $device->comment,
+            'sort_index' => $device->sortIndex,
             'home_scope' => $device->homeScope,
             'home_interface_id' => $device->homeInterfaceId,
             'last_check' => $device->lastSeenAt,

@@ -45,11 +45,17 @@ final class DatabaseSqlite extends Database
             value TEXT NOT NULL
         )');
 
+        $this->pdo()->exec('CREATE TABLE IF NOT EXISTS global_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )');
+
         $this->pdo()->exec('CREATE TABLE IF NOT EXISTS devices (
             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             serial_number TEXT NOT NULL,
             name TEXT NULL,
             comment TEXT NULL,
+            sort_index INTEGER NULL,
             home_scope TEXT NOT NULL DEFAULT \'all\',
             home_interface_id INTEGER NULL,
             last_seen_at DATETIME NULL,
@@ -57,6 +63,10 @@ final class DatabaseSqlite extends Database
             updated_at DATETIME NOT NULL,
             UNIQUE(serial_number)
         )');
+
+        if (!$this->columnExists('devices', 'sort_index')) {
+            $this->pdo()->exec('ALTER TABLE devices ADD COLUMN sort_index INTEGER NULL');
+        }
 
         if (!$this->columnExists('devices', 'home_scope')) {
             $this->pdo()->exec("ALTER TABLE devices ADD COLUMN home_scope TEXT NOT NULL DEFAULT 'all'");

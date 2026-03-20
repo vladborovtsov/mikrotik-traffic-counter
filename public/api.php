@@ -15,6 +15,7 @@ try {
         $request,
         $config,
         new App\Services\DeviceService($db),
+        new App\Services\GlobalSettingsService($db),
         new App\Services\InterfaceService($db),
         new App\Services\TrafficService($db, $database),
         new App\Services\RequestGuardService($config)

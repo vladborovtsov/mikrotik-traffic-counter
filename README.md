@@ -7,6 +7,7 @@ The v2 branch is a clean break from the legacy schema and now supports:
 - SQLite or MySQL through PDO
 - per-device and per-interface traffic storage
 - async frontend without page reloads
+- global light/dark/auto theme setting with browser-aware auto mode
 - optional collector token auth
 - optional collector source-IP allowlist
 - PHPUnit coverage for config, guards, and traffic services
@@ -77,6 +78,28 @@ Important settings:
 - `SOURCE_IP_ALLOWLIST=127.0.0.1,10.0.0.5`
 - `APP_TIMEZONE=UTC`
 - `DEFAULT_WINDOW_HOURS=48`
+
+## Global Settings
+
+The app stores instance-wide UI preferences in the database through a lazily created `global_settings` table.
+
+Current setting:
+
+- `theme_mode=light|dark|auto`
+
+Behavior:
+
+- `light` forces the light theme
+- `dark` forces the dark theme
+- `auto` follows the current browser/system `prefers-color-scheme` value
+- in `auto` mode, the UI updates live if the browser theme changes while the page is open
+
+You can change the theme from:
+
+- the header theme selector on any page
+- the dedicated app settings page
+
+The value is global for the whole app instance, not per browser.
 
 ## Local Run
 

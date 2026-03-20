@@ -10,6 +10,34 @@
     --accent-soft: #d8eee3;
     --danger: #8b3a32;
     --shadow: 0 18px 40px rgba(27, 45, 35, 0.08);
+    --spark-grid: #dce6df;
+    --spark-vertical: #eef3ef;
+    --spark-axis: #d9e2dd;
+    --spark-tx: #1b63d8;
+    --spark-rx: #c63b4f;
+    --tooltip-bg: rgba(22, 34, 27, 0.94);
+    --tooltip-text: #f7faf8;
+}
+
+[data-theme="dark"] {
+    --bg: #101714;
+    --panel: #16201b;
+    --panel-alt: #1b2822;
+    --text: #e4eee8;
+    --muted: #9fb0a6;
+    --line: #2d3b34;
+    --accent: #46b382;
+    --accent-strong: #9ce3c2;
+    --accent-soft: #1f3b30;
+    --danger: #f08d82;
+    --shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
+    --spark-grid: #314139;
+    --spark-vertical: #24312b;
+    --spark-axis: #415149;
+    --spark-tx: #6ea7ff;
+    --spark-rx: #ff8498;
+    --tooltip-bg: rgba(8, 12, 10, 0.96);
+    --tooltip-text: #f3f7f4;
 }
 
 * {
@@ -23,6 +51,12 @@ body {
     background:
         radial-gradient(circle at top left, rgba(31, 122, 85, 0.10), transparent 28%),
         linear-gradient(180deg, #f9fbf9 0%, var(--bg) 100%);
+}
+
+[data-theme="dark"] body {
+    background:
+        radial-gradient(circle at top left, rgba(70, 179, 130, 0.14), transparent 28%),
+        linear-gradient(180deg, #0d1310 0%, var(--bg) 100%);
 }
 
 .shell {
@@ -44,6 +78,35 @@ body {
     font-size: clamp(2rem, 4vw, 3.75rem);
     line-height: 0.95;
     letter-spacing: -0.04em;
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 12px;
+    align-items: center;
+}
+
+.theme-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--muted);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.9rem;
+}
+
+.theme-switch select {
+    width: auto;
+    min-width: 100px;
+    padding: 8px 10px;
+    border-radius: 10px;
 }
 
 .hero p {
@@ -97,7 +160,7 @@ body {
     padding: 16px 18px;
     border: 1px solid var(--line);
     border-radius: 18px;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fbf8 100%);
+    background: linear-gradient(180deg, var(--panel) 0%, color-mix(in srgb, var(--panel) 82%, var(--bg)) 100%);
 }
 
 .device-list-grid {
@@ -114,6 +177,23 @@ body {
     align-items: start;
 }
 
+.device-card-actions {
+    display: grid;
+    justify-items: end;
+    gap: 8px;
+}
+
+.device-order-buttons {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.btn-icon {
+    min-width: 36px;
+    padding: 8px 10px;
+    line-height: 1;
+}
+
 .device-link {
     background: none;
     border: none;
@@ -124,6 +204,21 @@ body {
     font-weight: bold;
     text-align: left;
     cursor: pointer;
+}
+
+.device-item-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 2px;
+}
+
+.btn-open-device {
+    padding: 7px 11px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    line-height: 1;
 }
 
 .meta {
@@ -146,7 +241,7 @@ body {
 .mini-window-switch button {
     padding: 8px 11px;
     border-radius: 999px;
-    background: #f3f7f4;
+    background: var(--panel);
     border-color: var(--line);
     color: var(--muted);
 }
@@ -196,7 +291,7 @@ textarea {
     padding: 11px 12px;
     border-radius: 12px;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--panel);
     color: var(--text);
 }
 
@@ -296,12 +391,37 @@ button:hover {
     align-content: start;
 }
 
+.interface-list-block {
+    display: grid;
+    gap: 8px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+}
+
+.interface-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.interface-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--panel-alt) 84%, var(--panel));
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
 .traffic-pair {
     display: flex;
     justify-content: space-between;
     gap: 12px;
     padding-top: 6px;
-    border-top: 1px solid #dde6e0;
+    border-top: 1px solid var(--line);
 }
 
 .traffic-pair:first-of-type {
@@ -318,7 +438,7 @@ button:hover {
     gap: 8px;
     padding: 12px 14px;
     border-radius: 16px;
-    background: linear-gradient(180deg, #fafdff 0%, #f3f7f4 100%);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 88%, #dff1ea) 0%, color-mix(in srgb, var(--panel-alt) 92%, var(--bg)) 100%);
     border: 1px solid var(--line);
 }
 
@@ -344,7 +464,7 @@ button:hover {
 .mini-scope-switch button {
     padding: 5px 8px;
     border-radius: 999px;
-    background: #f3f7f4;
+    background: var(--panel);
     border-color: var(--line);
     color: var(--muted);
     font-size: 0.8rem;
@@ -375,7 +495,23 @@ button:hover {
     min-height: 120px;
     display: grid;
     align-items: center;
+}
+
+.sparkline-body {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: start;
+}
+
+.sparkline-visual {
+    display: flex;
+    justify-content: center;
+}
+
+.sparkline-frame {
     position: relative;
+    width: min(300px, 100%);
 }
 
 .sparkline-svg {
@@ -395,13 +531,13 @@ button:hover {
     max-width: 220px;
     padding: 8px 10px;
     border-radius: 10px;
-    background: rgba(22, 34, 27, 0.94);
-    color: #f7faf8;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-text);
     font-size: 0.78rem;
     line-height: 1.35;
     pointer-events: none;
     box-shadow: 0 12px 30px rgba(9, 18, 13, 0.22);
-    transform: translateY(-100%);
+    transform: translate(-50%, -100%);
 }
 
 .sparkline-tooltip-line.tx {
@@ -427,6 +563,87 @@ button:hover {
     color: var(--muted);
 }
 
+.sparkline-timeline {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 4px;
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.sparkline-timeline span {
+    flex: 1 1 0;
+}
+
+.sparkline-timeline span:first-child {
+    text-align: left;
+}
+
+.sparkline-timeline span:nth-child(2) {
+    text-align: center;
+}
+
+.sparkline-timeline span:last-child {
+    text-align: right;
+}
+
+.sparkline-totals {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    align-content: start;
+    padding-left: 0;
+    width: min(320px, 100%);
+    justify-self: center;
+}
+
+.sparkline-total-block {
+    display: grid;
+    gap: 2px;
+    padding: 6px 8px;
+    text-align: center;
+    border-radius: 10px;
+}
+
+.sparkline-total-block strong {
+    font-size: 0.74rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.sparkline-total-block span {
+    font-size: 0.86rem;
+    color: var(--text);
+}
+
+.sparkline-total-block:nth-child(1) {
+    background: color-mix(in srgb, var(--spark-tx) 12%, transparent);
+}
+
+.sparkline-total-block:nth-child(1) strong,
+.sparkline-total-block:nth-child(3) strong {
+    color: var(--spark-tx);
+}
+
+.sparkline-total-block:nth-child(2) {
+    background: color-mix(in srgb, var(--spark-rx) 12%, transparent);
+}
+
+.sparkline-total-block:nth-child(2) strong,
+.sparkline-total-block:nth-child(4) strong {
+    color: var(--spark-rx);
+}
+
+.sparkline-total-block:nth-child(3) {
+    background: color-mix(in srgb, var(--spark-tx) 7%, transparent);
+}
+
+.sparkline-total-block:nth-child(4) {
+    background: color-mix(in srgb, var(--spark-rx) 7%, transparent);
+}
+
 .sparkline-legend span {
     display: inline-flex;
     align-items: center;
@@ -441,11 +658,11 @@ button:hover {
 }
 
 .swatch.tx {
-    background: #1b63d8;
+    background: var(--spark-tx);
 }
 
 .swatch.rx {
-    background: #c63b4f;
+    background: var(--spark-rx);
 }
 
 .summary-tile strong {
@@ -468,8 +685,8 @@ button:hover {
 
 .error-box {
     color: var(--danger);
-    background: #fff5f3;
-    border-color: #ebc7c1;
+    background: color-mix(in srgb, var(--danger) 10%, var(--panel));
+    border-color: color-mix(in srgb, var(--danger) 30%, var(--line));
 }
 
 .form-grid {
@@ -502,8 +719,17 @@ button:hover {
         align-items: start;
     }
 
+    .sparkline-totals {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding-left: 0;
+    }
+
     .hero {
         flex-direction: column;
         align-items: start;
+    }
+
+    .hero-actions {
+        justify-content: flex-start;
     }
 }

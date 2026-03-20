@@ -2,12 +2,19 @@ const app = document.getElementById('app');
 const state = readStateFromUrl();
 let deviceListCache = [];
 const listWindowByDevice = loadJsonStorage('mikstat.listWindowByDevice', {});
+let globalSettings = {
+    theme_mode: 'auto'
+};
+let themeMediaQuery = null;
+const themeModeSelector = document.getElementById('themeModeSelector');
+const openGlobalSettingsButton = document.getElementById('openGlobalSettings');
 
 function readStateFromUrl() {
     const params = new URLSearchParams(window.location.search);
     return {
         deviceId: params.get('id'),
         settingsDeviceId: params.get('settings_id'),
+        appSettings: params.get('settings') === 'app',
         interfaceId: params.get('interface_id'),
         windowHours: parseInt(params.get('window') || '48', 10) || 48,
         offset: parseInt(params.get('offset') || '0', 10) || 0,
@@ -19,6 +26,7 @@ function persistState(replace = false) {
     const params = new URLSearchParams();
     if (state.deviceId) params.set('id', state.deviceId);
     if (state.settingsDeviceId) params.set('settings_id', state.settingsDeviceId);
+    if (state.appSettings) params.set('settings', 'app');
     if (state.interfaceId) params.set('interface_id', state.interfaceId);
     if (state.windowHours !== 48) params.set('window', String(state.windowHours));
     if (state.offset !== 0) params.set('offset', String(state.offset));
@@ -39,6 +47,7 @@ function resetToList() {
     navigate({
         deviceId: null,
         settingsDeviceId: null,
+        appSettings: false,
         interfaceId: null,
         windowHours: 48,
         offset: 0
@@ -71,10 +80,67 @@ function saveJsonStorage(key, value) {
     }
 }
 
+function parseSqlDate(value) {
+    if (!value) {
+        return null;
+    }
+
+    const date = new Date(String(value).replace(' ', 'T'));
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function formatTimestamp(value) {
     if (!value) return 'never';
-    const date = new Date(value.replace(' ', 'T'));
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+    const date = parseSqlDate(value);
+    if (!date) {
+        return String(value);
+    }
+
+    return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+    }).format(date);
+}
+
+function formatDateOnly(value) {
+    const date = parseSqlDate(value);
+    if (!date) {
+        return String(value || '');
+    }
+
+    return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+    }).format(date);
+}
+
+function formatDateRange(fromValue, toValue) {
+    if (!fromValue || !toValue) {
+        return '';
+    }
+
+    const fromDate = parseSqlDate(fromValue);
+    const toDate = parseSqlDate(toValue);
+
+    if (!fromDate || !toDate) {
+        return `${fromValue} to ${toValue}`;
+    }
+
+    const sameDay = fromDate.getFullYear() === toDate.getFullYear()
+        && fromDate.getMonth() === toDate.getMonth()
+        && fromDate.getDate() === toDate.getDate();
+
+    if (sameDay) {
+        return formatDateOnly(fromValue);
+    }
+
+    return `${formatDateOnly(fromValue)} to ${formatDateOnly(toValue)}`;
 }
 
 function formatTraffic(input, unit = 'GB') {
@@ -118,6 +184,13 @@ async function render() {
     app.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
+        await ensureGlobalSettingsLoaded();
+
+        if (state.appSettings) {
+            renderGlobalSettingsPage();
+            return;
+        }
+
         if (state.settingsDeviceId) {
             const settings = await fetchJson({
                 action: 'getDeviceSettings',
@@ -160,6 +233,55 @@ async function render() {
     }
 }
 
+async function ensureGlobalSettingsLoaded() {
+    const settings = await fetchJson({ action: 'getGlobalSettings' });
+    globalSettings = settings;
+    applyThemeMode(settings.theme_mode || 'auto');
+    syncThemeSelector();
+}
+
+function applyThemeMode(themeMode) {
+    const root = document.documentElement;
+    const mode = ['light', 'dark', 'auto'].includes(themeMode) ? themeMode : 'auto';
+
+    if (themeMediaQuery === null && window.matchMedia) {
+        themeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        if (typeof themeMediaQuery.addEventListener === 'function') {
+            themeMediaQuery.addEventListener('change', () => {
+                if ((globalSettings.theme_mode || 'auto') === 'auto') {
+                    applyThemeMode('auto');
+                }
+            });
+        } else if (typeof themeMediaQuery.addListener === 'function') {
+            themeMediaQuery.addListener(() => {
+                if ((globalSettings.theme_mode || 'auto') === 'auto') {
+                    applyThemeMode('auto');
+                }
+            });
+        }
+    }
+
+    const effectiveMode = mode === 'auto' && themeMediaQuery?.matches ? 'dark' : mode === 'auto' ? 'light' : mode;
+    root.setAttribute('data-theme', effectiveMode);
+    root.style.colorScheme = effectiveMode;
+}
+
+function syncThemeSelector() {
+    if (themeModeSelector) {
+        themeModeSelector.value = globalSettings.theme_mode || 'auto';
+    }
+
+    const pageSelector = document.getElementById('globalThemeMode');
+    if (pageSelector) {
+        pageSelector.value = globalSettings.theme_mode || 'auto';
+    }
+}
+
+function getCssVariable(name, fallback = '') {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
+}
+
 function renderDeviceList(devices) {
     if (!devices.length) {
         app.innerHTML = '<div class="empty">No devices have reported traffic yet.</div>';
@@ -171,22 +293,39 @@ function renderDeviceList(devices) {
         const selectedScope = normalizeListScope(device.home_scope || 'all');
         const selectedInterfaceId = String(device.home_interface_id || '');
         const interfaces = Array.isArray(device.interfaces) ? device.interfaces : [];
+        const interfaceList = interfaces.length
+            ? interfaces.map((item) => `<span class="interface-chip">${escapeHtml(item.display_name || item.name)}</span>`).join('')
+            : '<span class="meta">No interfaces yet.</span>';
         return `
         <div class="device-item" data-device-card="${device.id}">
             <div class="device-item-head">
                 <div>
-                    <button class="device-link" data-open-device="${device.id}">
-                        ${escapeHtml(device.name || device.sn)}
-                    </button>
+                    <div class="device-item-title-row">
+                        <button class="device-link" data-open-device="${device.id}">
+                            ${escapeHtml(device.name || device.sn)}
+                        </button>
+                        <button class="btn-secondary btn-open-device" data-open-device="${device.id}" type="button">Open details</button>
+                    </div>
                     ${device.name ? `<div class="meta">Serial: ${escapeHtml(device.sn)}</div>` : ''}
+                    ${device.comment ? `<div class="meta">${escapeHtml(device.comment)}</div>` : ''}
                 </div>
-                <div class="meta">Last check: ${escapeHtml(formatTimestamp(device.last_check))}</div>
+                <div class="device-card-actions">
+                    <div class="meta">Last check: ${escapeHtml(formatTimestamp(device.last_check))}</div>
+                    <div class="device-order-buttons">
+                        <button class="btn-secondary btn-icon" data-device-move="up" data-device-id="${device.id}" type="button" aria-label="Move device up">↑</button>
+                        <button class="btn-secondary btn-icon" data-device-move="down" data-device-id="${device.id}" type="button" aria-label="Move device down">↓</button>
+                    </div>
+                </div>
             </div>
             <div class="device-list-grid">
                 <div class="summary-tile traffic-combined">
                     <strong>Latest Counters</strong>
                     <div class="traffic-pair"><span>Upload</span><span>${escapeHtml(formatTraffic(device.last_tx, state.unit))}</span></div>
                     <div class="traffic-pair"><span>Download</span><span>${escapeHtml(formatTraffic(device.last_rx, state.unit))}</span></div>
+                    <div class="interface-list-block">
+                        <strong>Interfaces</strong>
+                        <div class="interface-chip-list">${interfaceList}</div>
+                    </div>
                 </div>
                 <div class="mini-chart-card">
                     <div class="mini-chart-head">
@@ -219,7 +358,6 @@ function renderDeviceList(devices) {
                     <div class="mini-chart" data-sparkline='${escapeHtml(JSON.stringify(device.overview_chart_data || []))}' data-device-id="${device.id}"></div>
                 </div>
             </div>
-            <div class="meta">${escapeHtml(device.comment || 'No device comment configured.')}</div>
         </div>
     `;
     }).join('');
@@ -265,6 +403,26 @@ function renderDeviceList(devices) {
                     card.innerHTML = `<div class="meta">${escapeHtml(error instanceof Error ? error.message : String(error))}</div>`;
                 }
             }
+        });
+    });
+
+    app.querySelectorAll('[data-device-move]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const deviceId = button.getAttribute('data-device-id');
+            const direction = button.getAttribute('data-device-move');
+            if (!deviceId || !direction) {
+                return;
+            }
+
+            await fetchJson({
+                action: 'moveDevice',
+                id: String(deviceId),
+                direction
+            });
+
+            const devices = await fetchJson({ action: 'getDevices' });
+            deviceListCache = devices.map((device) => ({ ...device }));
+            renderDeviceList(deviceListCache);
         });
     });
 
@@ -340,6 +498,12 @@ function renderSparkline(container, chartData) {
     const width = 300;
     const height = 92;
     const padding = 8;
+    const plotWidth = width - (padding * 2);
+    const txColor = getCssVariable('--spark-tx', '#1b63d8');
+    const rxColor = getCssVariable('--spark-rx', '#c63b4f');
+    const gridColor = getCssVariable('--spark-grid', '#dce6df');
+    const verticalColor = getCssVariable('--spark-vertical', '#eef3ef');
+    const axisColor = getCssVariable('--spark-axis', '#d9e2dd');
     const values = chartData.flatMap((point) => [Number(point.tx || 0), Number(point.rx || 0)]);
     const maxValue = Math.max(...values, 0);
 
@@ -353,7 +517,7 @@ function renderSparkline(container, chartData) {
             return width / 2;
         }
 
-        return padding + (index * (width - (padding * 2))) / (chartData.length - 1);
+        return padding + (index * plotWidth) / (chartData.length - 1);
     };
     const yFor = (value) => {
         const usableHeight = height - (padding * 2);
@@ -367,22 +531,24 @@ function renderSparkline(container, chartData) {
     const rxValues = chartData.map((point) => Number(point.rx || 0));
     const txMax = Math.max(...txValues);
     const rxMax = Math.max(...rxValues);
+    const txTotal = txValues.reduce((sum, value) => sum + value, 0);
+    const rxTotal = rxValues.reduce((sum, value) => sum + value, 0);
     const gridLines = [0.25, 0.5, 0.75].map((ratio) => {
         const y = padding + ((height - (padding * 2)) * ratio);
-        return `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#dce6df" stroke-width="1"></line>`;
+        return `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="${gridColor}" stroke-width="1"></line>`;
     }).join('');
     const verticalLines = chartData.length > 1 ? chartData.map((point, index) => {
         if (index === 0 || index === chartData.length - 1) {
             return '';
         }
         const x = xFor(index);
-        return `<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}" stroke="#eef3ef" stroke-width="1"></line>`;
+        return `<line x1="${x}" y1="${padding}" x2="${x}" y2="${height - padding}" stroke="${verticalColor}" stroke-width="1"></line>`;
     }).join('') : '';
     const txDots = chartData.map((point, index) => `
-        <circle cx="${xFor(index)}" cy="${yFor(point.tx || 0)}" r="2.5" fill="#1b63d8"></circle>
+        <circle cx="${xFor(index)}" cy="${yFor(point.tx || 0)}" r="2.5" fill="${txColor}"></circle>
     `).join('');
     const rxDots = chartData.map((point, index) => `
-        <circle cx="${xFor(index)}" cy="${yFor(point.rx || 0)}" r="2.5" fill="#c63b4f"></circle>
+        <circle cx="${xFor(index)}" cy="${yFor(point.rx || 0)}" r="2.5" fill="${rxColor}"></circle>
     `).join('');
     const hitAreas = chartData.map((point, index) => {
         const timestamp = escapeHtml(formatTimestamp(point.hour));
@@ -401,22 +567,46 @@ function renderSparkline(container, chartData) {
             ></circle>
         `;
     }).join('');
+    const timelineLabels = buildTimelineLabels(chartData);
 
     container.innerHTML = `
-        <div class="sparkline-tooltip" hidden></div>
-        <svg viewBox="0 0 ${width} ${height}" class="sparkline-svg" aria-hidden="true">
-            ${gridLines}
-            ${verticalLines}
-            <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#d9e2dd" stroke-width="1"></line>
-            <polyline fill="none" stroke="#1b63d8" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" points="${txPoints}"></polyline>
-            <polyline fill="none" stroke="#c63b4f" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" points="${rxPoints}"></polyline>
-            ${txDots}
-            ${rxDots}
-            ${hitAreas}
-        </svg>
-        <div class="sparkline-scale">
-            <span>Max up: ${escapeHtml(formatTraffic(txMax, state.unit))}</span>
-            <span>Max down: ${escapeHtml(formatTraffic(rxMax, state.unit))}</span>
+        <div class="sparkline-body">
+            <div class="sparkline-visual">
+                <div class="sparkline-frame">
+                    <div class="sparkline-tooltip" hidden></div>
+                    <svg viewBox="0 0 ${width} ${height}" class="sparkline-svg" aria-hidden="true">
+                        ${gridLines}
+                        ${verticalLines}
+                        <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="${axisColor}" stroke-width="1"></line>
+                        <polyline fill="none" stroke="${txColor}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" points="${txPoints}"></polyline>
+                        <polyline fill="none" stroke="${rxColor}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" points="${rxPoints}"></polyline>
+                        ${txDots}
+                        ${rxDots}
+                        ${hitAreas}
+                    </svg>
+                    <div class="sparkline-timeline" style="margin-left:${padding}px; width:${plotWidth}px;">
+                        ${timelineLabels.map((label) => `<span>${escapeHtml(label)}</span>`).join('')}
+                    </div>
+                </div>
+            </div>
+            <div class="sparkline-totals">
+                <div class="sparkline-total-block">
+                    <strong>Total up</strong>
+                    <span>${escapeHtml(formatTraffic(txTotal, state.unit))}</span>
+                </div>
+                <div class="sparkline-total-block">
+                    <strong>Total down</strong>
+                    <span>${escapeHtml(formatTraffic(rxTotal, state.unit))}</span>
+                </div>
+                <div class="sparkline-total-block">
+                    <strong>Max up</strong>
+                    <span>${escapeHtml(formatTraffic(txMax, state.unit))}</span>
+                </div>
+                <div class="sparkline-total-block">
+                    <strong>Max down</strong>
+                    <span>${escapeHtml(formatTraffic(rxMax, state.unit))}</span>
+                </div>
+            </div>
         </div>
         <div class="sparkline-legend">
             <span><i class="swatch tx"></i>Upload</span>
@@ -426,6 +616,7 @@ function renderSparkline(container, chartData) {
 
     const tooltip = container.querySelector('.sparkline-tooltip');
     const hitNodes = container.querySelectorAll('.sparkline-hit');
+    const tooltipFrame = container.querySelector('.sparkline-frame');
 
     hitNodes.forEach((node) => {
         node.addEventListener('mouseenter', () => {
@@ -442,13 +633,13 @@ function renderSparkline(container, chartData) {
         });
 
         node.addEventListener('mousemove', (event) => {
-            if (!tooltip) {
+            if (!tooltip || !tooltipFrame) {
                 return;
             }
 
-            const bounds = container.getBoundingClientRect();
-            const left = event.clientX - bounds.left + 10;
-            const top = event.clientY - bounds.top - 10;
+            const bounds = tooltipFrame.getBoundingClientRect();
+            const left = event.clientX - bounds.left;
+            const top = event.clientY - bounds.top - 8;
             tooltip.style.left = `${left}px`;
             tooltip.style.top = `${top}px`;
         });
@@ -459,6 +650,39 @@ function renderSparkline(container, chartData) {
             }
         });
     });
+}
+
+function buildTimelineLabels(chartData) {
+    if (!Array.isArray(chartData) || chartData.length === 0) {
+        return [];
+    }
+
+    const indices = chartData.length === 1
+        ? [0]
+        : Array.from(new Set([
+            0,
+            Math.max(0, Math.floor((chartData.length - 1) / 2)),
+            chartData.length - 1
+        ]));
+
+    return indices.map((index) => formatTimelineLabel(chartData[index]?.hour || ''));
+}
+
+function formatTimelineLabel(value) {
+    if (!value) {
+        return '';
+    }
+
+    const date = parseSqlDate(value);
+    if (!date) {
+        return String(value);
+    }
+
+    return new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23'
+    }).format(date);
 }
 
 function normalizeListWindow(value) {
@@ -588,7 +812,7 @@ function renderDeviceDetail(detail) {
                 <div class="panel chart-card">
                     <div class="panel-header">
                         <h2 class="panel-title">Traffic Chart</h2>
-                        <p class="panel-subtitle">${escapeHtml(detail.window.offset === 0 ? `Last ${detail.window.length} hours` : `${detail.window.start} to ${detail.window.end}`)}</p>
+                        <p class="panel-subtitle">${escapeHtml(detail.window.offset === 0 ? `Last ${detail.window.length} hours` : formatDateRange(detail.window.start, detail.window.end))}</p>
                     </div>
                     <div class="panel-body">
                         <div id="dashboard_div">
@@ -680,10 +904,46 @@ function renderDeviceSettings(payload) {
     bindSettingsActions(device.id);
 }
 
+function renderGlobalSettingsPage() {
+    app.innerHTML = `
+        <div class="split">
+            <div class="device-summary">
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2 class="panel-title">App Settings</h2>
+                        <p class="panel-subtitle">Global preferences shared by the whole app instance.</p>
+                    </div>
+                    <div class="panel-body">
+                        <form id="globalSettingsForm" class="form-grid">
+                            <div>
+                                <label for="globalThemeMode">Theme mode</label>
+                                <select id="globalThemeMode" name="theme_mode">
+                                    <option value="auto" ${globalSettings.theme_mode === 'auto' ? 'selected' : ''}>Auto</option>
+                                    <option value="light" ${globalSettings.theme_mode === 'light' ? 'selected' : ''}>Light</option>
+                                    <option value="dark" ${globalSettings.theme_mode === 'dark' ? 'selected' : ''}>Dark</option>
+                                </select>
+                            </div>
+                            <div class="button-row">
+                                <button type="submit" class="btn-primary">Save settings</button>
+                                <button type="button" class="btn-secondary" data-action="back-to-list">Back to list</button>
+                            </div>
+                            <div id="globalSettingsStatus" class="meta"></div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    bindGlobalActions();
+    bindAppSettingsActions();
+    syncThemeSelector();
+}
+
 function renderStatCard(title, payload, unit, includeRange = true) {
     const stats = payload.data;
     const total = Number(stats.sumtx || 0) + Number(stats.sumrx || 0);
-    const range = includeRange ? `<div class="meta">${escapeHtml(payload.range.from)} to ${escapeHtml(payload.range.to)}</div>` : '';
+    const range = includeRange ? `<div class="meta">${escapeHtml(formatDateRange(payload.range.from, payload.range.to))}</div>` : '';
 
     return `
         <div class="stat-card">
@@ -740,6 +1000,37 @@ function bindGlobalActions() {
     });
 }
 
+function bindHeaderActions() {
+    openGlobalSettingsButton?.addEventListener('click', () => {
+        navigate({
+            appSettings: true,
+            deviceId: null,
+            settingsDeviceId: null,
+            interfaceId: null,
+            offset: 0
+        });
+    });
+
+    themeModeSelector?.addEventListener('change', async (event) => {
+        const nextThemeMode = event.target.value || 'auto';
+        const previousThemeMode = globalSettings.theme_mode || 'auto';
+
+        try {
+            globalSettings = await fetchJson({
+                action: 'updateGlobalSettings',
+                theme_mode: nextThemeMode
+            });
+            applyThemeMode(globalSettings.theme_mode || 'auto');
+            syncThemeSelector();
+        } catch (error) {
+            globalSettings.theme_mode = previousThemeMode;
+            applyThemeMode(previousThemeMode);
+            syncThemeSelector();
+            window.alert(error instanceof Error ? error.message : String(error));
+        }
+    });
+}
+
 function bindSettingsActions(deviceId) {
     document.getElementById('homeScope')?.addEventListener('change', (event) => {
         const row = document.getElementById('homeInterfaceRow');
@@ -790,6 +1081,28 @@ function bindSettingsActions(deviceId) {
     });
 }
 
+function bindAppSettingsActions() {
+    document.getElementById('globalSettingsForm')?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const statusNode = document.getElementById('globalSettingsStatus');
+        const form = new FormData(event.currentTarget);
+        const themeMode = String(form.get('theme_mode') || 'auto');
+
+        try {
+            statusNode.textContent = 'Saving...';
+            globalSettings = await fetchJson({
+                action: 'updateGlobalSettings',
+                theme_mode: themeMode
+            });
+            applyThemeMode(globalSettings.theme_mode || 'auto');
+            syncThemeSelector();
+            statusNode.textContent = 'Saved.';
+        } catch (error) {
+            statusNode.textContent = error instanceof Error ? error.message : String(error);
+        }
+    });
+}
+
 function bindDetailActions(deviceId) {
     document.getElementById('interfaceSelector')?.addEventListener('change', (event) => {
         navigate({
@@ -829,6 +1142,13 @@ function drawChart(chartData, windowInfo, unit) {
     emptyDiv.style.display = 'none';
 
     google.charts.setOnLoadCallback(() => {
+        const rootTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const chartText = getCssVariable('--text', '#16221b');
+        const chartMuted = getCssVariable('--muted', '#607064');
+        const chartLine = getCssVariable('--line', '#d4ddd5');
+        const chartPanel = getCssVariable('--panel', '#ffffff');
+        const txColor = getCssVariable('--spark-tx', '#1b63d8');
+        const rxColor = getCssVariable('--spark-rx', '#c63b4f');
         const data = new google.visualization.DataTable();
         data.addColumn('datetime', 'Timestamp');
         data.addColumn('number', `TX (${unit})`);
@@ -854,15 +1174,27 @@ function drawChart(chartData, windowInfo, unit) {
             containerId: 'chart_div',
             options: {
                 legend: { position: 'top' },
+                backgroundColor: chartPanel,
                 height: 380,
                 pointSize: 5,
                 lineWidth: 2,
                 chartArea: { left: 60, right: 20, top: 48, bottom: 60 },
-                colors: ['#1f7a55', '#14513a'],
+                colors: [txColor, rxColor],
+                legendTextStyle: { color: chartText },
                 hAxis: {
                     minValue: new Date(windowInfo.start.replace(' ', 'T')),
-                    maxValue: new Date(windowInfo.end.replace(' ', 'T'))
-                }
+                    maxValue: new Date(windowInfo.end.replace(' ', 'T')),
+                    textStyle: { color: chartMuted },
+                    gridlines: { color: chartLine },
+                    baselineColor: chartLine
+                },
+                vAxis: {
+                    textStyle: { color: chartMuted },
+                    gridlines: { color: chartLine },
+                    baselineColor: chartLine
+                },
+                explorer: { axis: 'horizontal', keepInBounds: true },
+                tooltip: { textStyle: { color: chartText } }
             }
         });
 
@@ -874,9 +1206,20 @@ function drawChart(chartData, windowInfo, unit) {
                 ui: {
                     chartType: 'LineChart',
                     chartOptions: {
+                        backgroundColor: chartPanel,
                         height: 96,
                         chartArea: { left: 60, right: 20, top: 8, bottom: 24 },
-                        colors: ['#9bcdb8', '#a6b9ae']
+                        colors: [txColor, rxColor],
+                        hAxis: {
+                            textStyle: { color: chartMuted },
+                            gridlines: { color: rootTheme === 'dark' ? chartPanel : chartLine },
+                            baselineColor: chartLine
+                        },
+                        vAxis: {
+                            textStyle: { color: chartMuted },
+                            gridlines: { color: rootTheme === 'dark' ? chartPanel : chartLine },
+                            baselineColor: chartLine
+                        }
                     }
                 }
             }
@@ -892,4 +1235,5 @@ window.addEventListener('popstate', () => {
     render();
 });
 
+bindHeaderActions();
 render();

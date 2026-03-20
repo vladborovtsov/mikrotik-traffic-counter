@@ -18,7 +18,23 @@ final class DeviceService
      */
     public function listDevices(): array
     {
-        $stmt = $this->db->query('SELECT * FROM devices ORDER BY last_seen_at DESC, id DESC');
+        $stmt = $this->db->query('SELECT d.*
+            FROM devices d
+            LEFT JOIN (
+                SELECT device_id, MAX(last_seen_at) AS interface_last_seen_at
+                FROM interfaces
+                GROUP BY device_id
+            ) latest_interface_activity ON latest_interface_activity.device_id = d.id
+            ORDER BY
+                CASE WHEN d.sort_index IS NULL THEN 1 ELSE 0 END ASC,
+                d.sort_index ASC,
+                CASE
+                    WHEN latest_interface_activity.interface_last_seen_at IS NOT NULL
+                        AND (d.last_seen_at IS NULL OR latest_interface_activity.interface_last_seen_at > d.last_seen_at)
+                    THEN latest_interface_activity.interface_last_seen_at
+                    ELSE d.last_seen_at
+                END DESC,
+                d.id DESC');
         $rows = $stmt->fetchAll();
 
         return array_map(static fn (array $row): Device => Device::fromRow($row), $rows);
@@ -72,7 +88,7 @@ final class DeviceService
     }
 
     /**
-     * @param array{name?: ?string, comment?: ?string, home_scope?: ?string, home_interface_id?: ?int, last_seen_at?: ?string} $fields
+     * @param array{name?: ?string, comment?: ?string, sort_index?: ?int, home_scope?: ?string, home_interface_id?: ?int, last_seen_at?: ?string} $fields
      */
     public function updateDevice(int $id, array $fields, string $timestamp): ?Device
     {
@@ -87,6 +103,11 @@ final class DeviceService
         if (array_key_exists('comment', $fields)) {
             $assignments[] = 'comment = :comment';
             $params[':comment'] = $fields['comment'];
+        }
+
+        if (array_key_exists('sort_index', $fields)) {
+            $assignments[] = 'sort_index = :sort_index';
+            $params[':sort_index'] = $fields['sort_index'];
         }
 
         if (array_key_exists('home_scope', $fields)) {
@@ -132,5 +153,64 @@ final class DeviceService
         $stmt->execute([':id' => $id]);
 
         return $stmt->rowCount() > 0;
+    }
+
+    public function moveDevice(int $id, string $direction, string $timestamp): ?Device
+    {
+        $devices = $this->listDevices();
+        if ($devices === []) {
+            return null;
+        }
+
+        $needsNormalization = false;
+        foreach ($devices as $device) {
+            if ($device->sortIndex === null) {
+                $needsNormalization = true;
+                break;
+            }
+        }
+
+        if ($needsNormalization) {
+            $this->rewriteSortIndexes($devices, $timestamp);
+            $devices = $this->listDevices();
+        }
+
+        $currentIndex = null;
+        foreach ($devices as $index => $device) {
+            if ($device->id === $id) {
+                $currentIndex = $index;
+                break;
+            }
+        }
+
+        if ($currentIndex === null) {
+            return null;
+        }
+
+        $targetIndex = $direction === 'up' ? $currentIndex - 1 : $currentIndex + 1;
+        if (!isset($devices[$targetIndex])) {
+            return $this->getDeviceById($id);
+        }
+
+        [$devices[$currentIndex], $devices[$targetIndex]] = [$devices[$targetIndex], $devices[$currentIndex]];
+        $this->rewriteSortIndexes($devices, $timestamp);
+
+        return $this->getDeviceById($id);
+    }
+
+    /**
+     * @param array<int, Device> $devices
+     */
+    private function rewriteSortIndexes(array $devices, string $timestamp): void
+    {
+        $stmt = $this->db->prepare('UPDATE devices SET sort_index = :sort_index, updated_at = :updated_at WHERE id = :id');
+
+        foreach (array_values($devices) as $index => $device) {
+            $stmt->execute([
+                ':sort_index' => $index + 1,
+                ':updated_at' => $timestamp,
+                ':id' => $device->id,
+            ]);
+        }
     }
 }

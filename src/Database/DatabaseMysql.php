@@ -45,11 +45,17 @@ final class DatabaseMysql extends Database
             `value` VARCHAR(255) NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 
+        $this->pdo()->exec('CREATE TABLE IF NOT EXISTS global_settings (
+            `key` VARCHAR(191) PRIMARY KEY,
+            `value` VARCHAR(255) NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
         $this->pdo()->exec('CREATE TABLE IF NOT EXISTS devices (
             id INT AUTO_INCREMENT PRIMARY KEY,
             serial_number VARCHAR(191) NOT NULL,
             name VARCHAR(255) NULL,
             comment VARCHAR(255) NULL,
+            sort_index INT NULL,
             home_scope VARCHAR(32) NOT NULL DEFAULT \'all\',
             home_interface_id INT NULL,
             last_seen_at DATETIME NULL,
@@ -57,6 +63,10 @@ final class DatabaseMysql extends Database
             updated_at DATETIME NOT NULL,
             UNIQUE KEY uniq_devices_serial_number (serial_number)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        if (!$this->columnExists('devices', 'sort_index')) {
+            $this->pdo()->exec('ALTER TABLE devices ADD COLUMN sort_index INT NULL AFTER comment');
+        }
 
         if (!$this->columnExists('devices', 'home_scope')) {
             $this->pdo()->exec("ALTER TABLE devices ADD COLUMN home_scope VARCHAR(32) NOT NULL DEFAULT 'all' AFTER comment");
