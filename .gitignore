@@ -1,6 +1,20 @@
 #Ignore DB file
 *.sqlite
 
+# Environment configuration
+.env
+
+# Composer artifacts
+/vendor/
+.phpunit.cache/
+/var/*
+!/var/.gitignore
+/mysql_data/
+/build/
+
+# macOS
+.DS_Store
+
 #Ignore mikrotik configuration
 mikrotik_configuration.txt
 

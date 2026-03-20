@@ -1,27 +1,13 @@
 <?php
-//set local timezone
-date_default_timezone_set('Europe/Belgrade');
+declare(strict_types=1);
 
-// Create a new database, if the file doesn't exist and open it for reading/writing.
-// The extension of the file is arbitrary.
-$db = new SQLite3('tikstats.sqlite', SQLITE3_OPEN_CREATE | SQLITE3_OPEN_READWRITE);
+/** @var array{config: \App\Config\Configuration, database: \App\Database\Database, pdo: \PDO} $runtime */
+$runtime = require __DIR__ . '/bootstrap.php';
 
-// Create tables.
-// Base table for devices
-$db->query('CREATE TABLE IF NOT EXISTS "devices" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "sn" TEXT,
-    "comment" VARCHAR,
-    "last_check" DATETIME,
-    "last_tx" INT,
-    "last_rx" INT
-)');
+$config = $runtime['config'];
+$database = $runtime['database'];
+$db = $runtime['pdo'];
 
-// Base table for detailed traffic
-$db->query('CREATE TABLE IF NOT EXISTS "traffic" (
-    "id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    "device_id" INT,
-    "timestamp" DATETIME,
-    "tx" INT,
-    "rx" INT
-)');
+$database->initializeSchema();
+
+return $runtime;
