@@ -49,6 +49,12 @@ Start from:
 cp .env.example .env
 ```
 
+For production deployments, you can also start from:
+
+```bash
+cp .env.production.example .env
+```
+
 Important settings:
 
 - `DB_DRIVER=sqlite` or `mysql`
@@ -143,6 +149,20 @@ Or do both in one step:
 bash scripts/build-release.sh --composer-install
 ```
 
+If you do not want PHP or Composer on the host machine, use the Docker wrapper instead:
+
+```bash
+bash scripts/build-release-docker.sh
+```
+
+That runs the existing release build inside the `php` container and performs `--composer-install` automatically.
+
+If the PHP image was already built before this script was added, rebuild it first:
+
+```bash
+docker compose build php
+```
+
 This creates:
 
 ```text
@@ -156,6 +176,7 @@ The release build keeps runtime files such as:
 - `vendor/`
 - `configuration.php`
 - `.env.example`
+- `.env.production.example`
 - `var/`
 
 It excludes development-only or local-only content such as:
@@ -169,7 +190,7 @@ It excludes development-only or local-only content such as:
 
 After building the release:
 
-1. copy your real `.env` into `build/release`
+1. create a real `.env` in `build/release` from `.env.example` or `.env.production.example`
 2. upload `build/release`
 3. configure the web server document root to `public/`
 

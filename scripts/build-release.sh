@@ -43,6 +43,7 @@ mkdir -p "$RELEASE_DIR/var/database"
 
 rsync -a \
     --exclude='.git/' \
+    --exclude='.gitignore' \
     --exclude='.idea/' \
     --exclude='.phpunit.cache/' \
     --exclude='build/' \
@@ -57,6 +58,7 @@ rsync -a \
     --exclude='index_screenshot.png' \
     --exclude='phpunit.xml.dist' \
     --exclude='scripts/build-release.sh' \
+    --exclude='scripts/build-release-docker.sh' \
     --exclude='scripts/export-legacy-sqlite.php' \
     --exclude='scripts/import-legacy-json.php' \
     --exclude='docker-compose.yml' \
@@ -65,7 +67,7 @@ rsync -a \
     ./ "$RELEASE_DIR/"
 
 cp .env.example "$RELEASE_DIR/.env.example"
-touch "$RELEASE_DIR/var/.gitignore"
+cp .env.production.example "$RELEASE_DIR/.env.production.example"
 
 cat <<EOF
 Release directory created at:

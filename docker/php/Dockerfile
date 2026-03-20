@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     libzip-dev \
     libsqlite3-dev \
     git \
+    rsync \
     zip \
     unzip \
     && rm -rf /var/lib/apt/lists/*
