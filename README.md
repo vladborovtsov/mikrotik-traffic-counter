@@ -45,6 +45,15 @@ All runtime configuration is centralized in [configuration.php](/workspace/mikro
 
 If you want the fallback file to be something other than `.env`, set `APP_ENV_FILE` to a relative path like `.env.production` or an absolute path. Real environment variables still take precedence over file values.
 
+Config override workflow:
+- keep normal local development settings in `.env`
+- use `APP_ENV_FILE` for one-off commands that should target a different environment without replacing `.env`
+- example:
+
+```bash
+APP_ENV_FILE=.env.production php scripts/import-legacy-json.php ./export.json --mapping=./mapping.json
+```
+
 Start from:
 
 ```bash

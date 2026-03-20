@@ -2,7 +2,8 @@
 *.sqlite
 
 # Environment configuration
-.env
+.env*
+!.env*.example
 
 # Composer artifacts
 /vendor/
