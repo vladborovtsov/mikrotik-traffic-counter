@@ -53,6 +53,32 @@ final class ConfigurationFactoryTest extends TestCase
         ]);
     }
 
+    public function testAppEnvFileOverridesDefaultDotEnvPath(): void
+    {
+        $root = $this->createTempDirectory();
+
+        file_put_contents($root . '/.env', implode(PHP_EOL, [
+            'APP_TIMEZONE=Europe/Belgrade',
+            'DB_DRIVER=sqlite',
+            'DB_SQLITE_PATH=default.sqlite',
+            '',
+        ]));
+
+        file_put_contents($root . '/.env.production', implode(PHP_EOL, [
+            'APP_TIMEZONE=UTC',
+            'DB_DRIVER=sqlite',
+            'DB_SQLITE_PATH=production.sqlite',
+            '',
+        ]));
+
+        $configuration = ConfigurationFactory::create($root, [
+            'APP_ENV_FILE' => '.env.production',
+        ]);
+
+        self::assertSame('UTC', $configuration->requireString('APP_TIMEZONE'));
+        self::assertSame($root . '/production.sqlite', $configuration->requireString('DB_SQLITE_PATH'));
+    }
+
     public function testInvalidTimezoneIsRejected(): void
     {
         $root = $this->createTempDirectory();

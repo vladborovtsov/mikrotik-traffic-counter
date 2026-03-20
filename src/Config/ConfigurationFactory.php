@@ -15,7 +15,7 @@ final class ConfigurationFactory
      */
     public static function create(string $rootPath, array $runtimeEnvironment): Configuration
     {
-        $envValues = EnvFileLoader::load($rootPath . '/.env');
+        $envValues = EnvFileLoader::load(self::resolveEnvFilePath($rootPath, $runtimeEnvironment));
         $values = self::mergeEnvironment($envValues, $runtimeEnvironment);
         $normalized = self::normalize($rootPath, $values);
 
@@ -161,5 +161,23 @@ final class ConfigurationFactory
     private static function isAbsolutePath(string $path): bool
     {
         return $path !== '' && ($path[0] === '/' || preg_match('/^[A-Za-z]:\\\\/', $path) === 1);
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeEnvironment
+     */
+    private static function resolveEnvFilePath(string $rootPath, array $runtimeEnvironment): string
+    {
+        $envFile = trim((string) ($runtimeEnvironment['APP_ENV_FILE'] ?? '.env'));
+
+        if ($envFile === '') {
+            $envFile = '.env';
+        }
+
+        if (self::isAbsolutePath($envFile)) {
+            return $envFile;
+        }
+
+        return $rootPath . '/' . ltrim($envFile, '/');
     }
 }

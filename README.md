@@ -43,6 +43,8 @@ The UI is written to work both at the web root and under a subfolder deployment,
 
 All runtime configuration is centralized in [configuration.php](/workspace/mikrotik-traffic-counter/configuration.php) and loaded from real environment variables first, then `.env`.
 
+If you want the fallback file to be something other than `.env`, set `APP_ENV_FILE` to a relative path like `.env.production` or an absolute path. Real environment variables still take precedence over file values.
+
 Start from:
 
 ```bash
