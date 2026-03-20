@@ -195,7 +195,7 @@ If deploying under a subfolder instead of the domain root, point that subfolder 
 Collector ingestion is implemented in:
 
 ```text
-/collect
+/collect/
 ```
 
 Required query parameters:
@@ -213,7 +213,7 @@ Optional query parameters:
 Example collector request:
 
 ```text
-http://<server>/collect?sn=ABC123456789&interface=ether1&tx=1000&rx=2000&delta=true
+http://<server>/collect/?sn=ABC123456789&interface=ether1&tx=1000&rx=2000&delta=true
 ```
 
 Fallback direct API request:
@@ -229,7 +229,7 @@ http://<server>/api.php?action=collect&sn=ABC123456789&interface=ether1&tx=1000&
 :local iface "ether3"
 :local txbytes ([/interface get [find name=$iface] tx-byte])
 :local rxbytes ([/interface get [find name=$iface] rx-byte])
-/tool fetch url=("http://<server>/collect\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true") mode=http keep-result=no
+/tool fetch url=("http://<server>/collect/\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true") mode=http keep-result=no
 :log info ("Traffic data sent for $iface, tx $txbytes, rx $rxbytes")
 ```
 
@@ -241,7 +241,7 @@ With auth enabled:
 :local txbytes ([/interface get [find name=$iface] tx-byte])
 :local rxbytes ([/interface get [find name=$iface] rx-byte])
 :local token "replace_me"
-/tool fetch url=("http://<server>/collect\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true&auth=$token") mode=http keep-result=no
+/tool fetch url=("http://<server>/collect/\?sn=$sysnumber&interface=$iface&tx=$txbytes&rx=$rxbytes&delta=true&auth=$token") mode=http keep-result=no
 ```
 
 Scheduler example:
@@ -401,13 +401,13 @@ Recommended validation before production use:
 - run the full stack end-to-end in Docker
 - review the UI in a real browser
 - verify MySQL-backed tests end-to-end in an environment with MySQL available
-- send real MikroTik collector requests against `/collect`
+- send real MikroTik collector requests against `/collect/`
 
 ## Suggested Full-Stack Validation
 
 1. Start SQLite mode with `docker compose up --build`.
 2. Open `http://127.0.0.1/` and verify the UI loads.
-3. Send a few collector requests to `/collect` with different interface names for the same serial number.
+3. Send a few collector requests to `/collect/` with different interface names for the same serial number.
 4. Verify:
    - the device appears in the list
    - per-interface selection works
