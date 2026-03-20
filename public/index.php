@@ -16,8 +16,9 @@ declare(strict_types=1);
 <body>
     <div class="shell">
         <div class="hero">
-            <div>
-                <h1>Mikrotik Traffic Counter</h1>
+            <div class="hero-title-row">
+                <button id="headerBackButton" class="btn-secondary header-back-button" type="button" hidden aria-label="Back to list">←</button>
+                <button id="headerHomeButton" class="hero-title-button" type="button">Mikrotik Traffic Counter</button>
             </div>
             <div class="hero-actions">
                 <button id="openGlobalSettings" class="btn-secondary" type="button">Settings</button>

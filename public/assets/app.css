@@ -73,11 +73,37 @@ body {
     margin-bottom: 24px;
 }
 
-.hero h1 {
+.hero-title-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.hero-title-button {
     margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--text);
     font-size: clamp(2rem, 4vw, 3.75rem);
     line-height: 0.95;
     letter-spacing: -0.04em;
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    text-align: left;
+}
+
+.hero-title-button:hover {
+    transform: none;
+    color: var(--accent-strong);
+}
+
+.header-back-button {
+    min-width: 42px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    font-size: 1.15rem;
+    line-height: 1;
 }
 
 .hero-actions {
@@ -344,7 +370,7 @@ button:hover {
 .stat-card {
     border-radius: 18px;
     border: 1px solid var(--line);
-    background: linear-gradient(180deg, #ffffff 0%, #f5f9f6 100%);
+    background: linear-gradient(180deg, var(--panel) 0%, color-mix(in srgb, var(--panel-alt) 68%, var(--panel)) 100%);
     padding: 16px;
 }
 
@@ -370,6 +396,18 @@ button:hover {
 .device-summary {
     display: grid;
     gap: 16px;
+}
+
+.detail-layout {
+    width: 100%;
+}
+
+.detail-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .summary-grid {
@@ -702,6 +740,44 @@ button:hover {
     border: 1px dashed var(--line);
     border-radius: 18px;
     background: var(--panel-alt);
+}
+
+div.google-visualization-tooltip {
+    background: var(--panel) !important;
+    border: 1px solid var(--line) !important;
+    color: var(--text) !important;
+    box-shadow: var(--shadow) !important;
+    border-radius: 12px !important;
+}
+
+div.google-visualization-tooltip *,
+div.google-visualization-tooltip span {
+    color: var(--text) !important;
+}
+
+.chart-tooltip {
+    min-width: 190px;
+    padding: 10px 12px;
+    background: var(--panel);
+    color: var(--text);
+}
+
+.chart-tooltip-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.chart-tooltip-line {
+    font-size: 0.9rem;
+    line-height: 1.35;
+}
+
+.chart-tooltip-line.tx {
+    color: var(--spark-tx);
+}
+
+.chart-tooltip-line.rx {
+    color: var(--spark-rx);
 }
 
 @media (max-width: 960px) {

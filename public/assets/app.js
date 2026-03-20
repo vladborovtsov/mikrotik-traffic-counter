@@ -8,6 +8,8 @@ let globalSettings = {
 let themeMediaQuery = null;
 const themeModeSelector = document.getElementById('themeModeSelector');
 const openGlobalSettingsButton = document.getElementById('openGlobalSettings');
+const headerBackButton = document.getElementById('headerBackButton');
+const headerHomeButton = document.getElementById('headerHomeButton');
 
 function readStateFromUrl() {
     const params = new URLSearchParams(window.location.search);
@@ -185,6 +187,7 @@ async function render() {
 
     try {
         await ensureGlobalSettingsLoaded();
+        syncHeaderNavigation();
 
         if (state.appSettings) {
             renderGlobalSettingsPage();
@@ -223,6 +226,7 @@ async function render() {
         const detail = await fetchJson(request);
         renderDeviceDetail(detail);
     } catch (error) {
+        syncHeaderNavigation();
         app.innerHTML = `
             <div class="error-box">${escapeHtml(error instanceof Error ? error.message : String(error))}</div>
             <div class="button-row">
@@ -230,6 +234,13 @@ async function render() {
             </div>
         `;
         bindGlobalActions();
+    }
+}
+
+function syncHeaderNavigation() {
+    const showBackButton = Boolean(state.deviceId || state.settingsDeviceId || state.appSettings);
+    if (headerBackButton) {
+        headerBackButton.hidden = !showBackButton;
     }
 }
 
@@ -739,108 +750,95 @@ function renderDeviceDetail(detail) {
     ].join('');
 
     app.innerHTML = `
-        <div class="split">
-            <div class="device-summary">
-                <div class="panel">
-                    <div class="panel-header">
+        <div class="device-summary detail-layout">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="detail-title-row">
                         <h2 class="panel-title">${escapeHtml(device.name || device.sn)}</h2>
-                        <p class="panel-subtitle">
-                            Serial ${escapeHtml(device.sn)}
-                            ${selectedInterfaceId ? ` · interface ${escapeHtml((interfaces.find((item) => String(item.id) === selectedInterfaceId)?.display_name || interfaces.find((item) => String(item.id) === selectedInterfaceId)?.name || 'selected'))}` : ' · all interfaces'}
-                        </p>
+                        <button class="btn-secondary" data-open-settings="${device.id}" type="button">Open settings</button>
                     </div>
-                    <div class="panel-body">
-                        <div class="summary-grid">
-                            <div class="summary-tile">
-                                <strong>Last Upload</strong>
-                                ${escapeHtml(formatTraffic(device.last_tx, state.unit))}
-                            </div>
-                            <div class="summary-tile">
-                                <strong>Last Download</strong>
-                                ${escapeHtml(formatTraffic(device.last_rx, state.unit))}
-                            </div>
-                            <div class="summary-tile">
-                                <strong>Last Check</strong>
-                                ${escapeHtml(formatTimestamp(device.last_check))}
-                            </div>
-                            <div class="summary-tile">
-                                <strong>Comment</strong>
-                                ${escapeHtml(device.comment || 'None')}
-                            </div>
-                        </div>
-                    </div>
+                    <p class="panel-subtitle">
+                        Serial ${escapeHtml(device.sn)}
+                        ${selectedInterfaceId ? ` · interface ${escapeHtml((interfaces.find((item) => String(item.id) === selectedInterfaceId)?.display_name || interfaces.find((item) => String(item.id) === selectedInterfaceId)?.name || 'selected'))}` : ' · all interfaces'}
+                    </p>
                 </div>
-
-                <div class="panel">
-                    <div class="panel-header">
-                        <h2 class="panel-title">Controls</h2>
-                        <p class="panel-subtitle">Switch interface, time window, and units without leaving the page.</p>
-                    </div>
-                    <div class="panel-body">
-                        <div class="toolbar">
-                            <div class="toolbar-group">
-                                <label for="interfaceSelector">Interface</label>
-                                <select id="interfaceSelector">${interfaceOptions}</select>
-                            </div>
-                            <div class="toolbar-group">
-                                <label for="windowSelector">Window</label>
-                                <select id="windowSelector">
-                                    ${[1, 3, 6, 12, 24, 48, 72, 168, 336, 720, 1440, 2160, 4320].map((hours) => {
-                                        const selected = hours === state.windowHours ? 'selected' : '';
-                                        const label = hours < 24 ? `${hours} hours` : `${Math.round(hours / 24)} days`;
-                                        return `<option value="${hours}" ${selected}>${label}</option>`;
-                                    }).join('')}
-                                </select>
-                            </div>
-                            <div class="toolbar-group">
-                                <label for="unitSelector">Units</label>
-                                <select id="unitSelector">
-                                    ${units.map((unit) => `<option value="${unit}" ${unit === state.unit ? 'selected' : ''}>${unit}</option>`).join('')}
-                                </select>
-                            </div>
+                <div class="panel-body">
+                    <div class="summary-grid">
+                        <div class="summary-tile">
+                            <strong>Last Upload</strong>
+                            ${escapeHtml(formatTraffic(device.last_tx, state.unit))}
                         </div>
-                        <div class="button-row" style="margin-top: 14px;">
-                            <button class="btn-secondary" data-shift-window="older">Older</button>
-                            ${state.offset > 0 ? '<button class="btn-secondary" data-shift-window="current">Current</button>' : ''}
-                            ${state.offset > 0 ? '<button class="btn-secondary" data-shift-window="newer">Newer</button>' : ''}
-                            <button class="btn-secondary" data-open-settings="${device.id}">Settings</button>
-                            <button class="btn-secondary" data-action="back-to-list">Back to list</button>
+                        <div class="summary-tile">
+                            <strong>Last Download</strong>
+                            ${escapeHtml(formatTraffic(device.last_rx, state.unit))}
+                        </div>
+                        <div class="summary-tile">
+                            <strong>Last Check</strong>
+                            ${escapeHtml(formatTimestamp(device.last_check))}
+                        </div>
+                        <div class="summary-tile">
+                            <strong>Comment</strong>
+                            ${escapeHtml(device.comment || 'None')}
                         </div>
                     </div>
-                </div>
-
-                <div class="panel chart-card">
-                    <div class="panel-header">
-                        <h2 class="panel-title">Traffic Chart</h2>
-                        <p class="panel-subtitle">${escapeHtml(detail.window.offset === 0 ? `Last ${detail.window.length} hours` : formatDateRange(detail.window.start, detail.window.end))}</p>
-                    </div>
-                    <div class="panel-body">
-                        <div id="dashboard_div">
-                            <div id="chart_div" style="width: 100%; height: 380px;"></div>
-                            <div id="filter_div" style="width: 100%; height: 96px;"></div>
-                        </div>
-                        <div id="chart_empty" class="chart-empty" style="display: none;">No traffic samples in the selected range.</div>
-                    </div>
-                </div>
-
-                <div class="stats-grid">
-                    ${renderStatCard('Daily', stats.daily, state.unit)}
-                    ${renderStatCard('Weekly', stats.weekly, state.unit)}
-                    ${renderStatCard('Monthly', stats.monthly, state.unit)}
-                    ${renderStatCard('Total', stats.total, state.unit, false)}
                 </div>
             </div>
 
             <div class="panel">
                 <div class="panel-header">
-                    <h2 class="panel-title">Device Settings</h2>
-                    <p class="panel-subtitle">Manage display name, comment, and home-page preferences on a dedicated page.</p>
+                    <h2 class="panel-title">Controls</h2>
+                    <p class="panel-subtitle">Switch interface, time window, and units without leaving the page.</p>
                 </div>
                 <div class="panel-body">
-                    <div class="button-row">
-                        <button class="btn-secondary" data-open-settings="${device.id}">Open settings</button>
+                    <div class="toolbar">
+                        <div class="toolbar-group">
+                            <label for="interfaceSelector">Interface</label>
+                            <select id="interfaceSelector">${interfaceOptions}</select>
+                        </div>
+                        <div class="toolbar-group">
+                            <label for="windowSelector">Window</label>
+                            <select id="windowSelector">
+                                ${[1, 3, 6, 12, 24, 48, 72, 168, 336, 720, 1440, 2160, 4320].map((hours) => {
+                                    const selected = hours === state.windowHours ? 'selected' : '';
+                                    const label = hours < 24 ? `${hours} hours` : `${Math.round(hours / 24)} days`;
+                                    return `<option value="${hours}" ${selected}>${label}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+                        <div class="toolbar-group">
+                            <label for="unitSelector">Units</label>
+                            <select id="unitSelector">
+                                ${units.map((unit) => `<option value="${unit}" ${unit === state.unit ? 'selected' : ''}>${unit}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="button-row" style="margin-top: 14px;">
+                        <button class="btn-secondary" data-shift-window="older">Older</button>
+                        ${state.offset > 0 ? '<button class="btn-secondary" data-shift-window="current">Current</button>' : ''}
+                        ${state.offset > 0 ? '<button class="btn-secondary" data-shift-window="newer">Newer</button>' : ''}
                     </div>
                 </div>
+            </div>
+
+            <div class="panel chart-card">
+                <div class="panel-header">
+                    <h2 class="panel-title">Traffic Chart</h2>
+                    <p class="panel-subtitle">${escapeHtml(detail.window.offset === 0 ? `Last ${detail.window.length} hours` : formatDateRange(detail.window.start, detail.window.end))}</p>
+                </div>
+                <div class="panel-body">
+                    <div id="dashboard_div">
+                        <div id="chart_div" style="width: 100%; height: 380px;"></div>
+                        <div id="filter_div" style="width: 100%; height: 96px;"></div>
+                    </div>
+                    <div id="chart_empty" class="chart-empty" style="display: none;">No traffic samples in the selected range.</div>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                ${renderStatCard('Daily', stats.daily, state.unit)}
+                ${renderStatCard('Weekly', stats.weekly, state.unit)}
+                ${renderStatCard('Monthly', stats.monthly, state.unit)}
+                ${renderStatCard('Total', stats.total, state.unit, false)}
             </div>
         </div>
     `;
@@ -1001,6 +999,14 @@ function bindGlobalActions() {
 }
 
 function bindHeaderActions() {
+    headerHomeButton?.addEventListener('click', () => {
+        resetToList();
+    });
+
+    headerBackButton?.addEventListener('click', () => {
+        resetToList();
+    });
+
     openGlobalSettingsButton?.addEventListener('click', () => {
         navigate({
             appSettings: true,
@@ -1152,7 +1158,9 @@ function drawChart(chartData, windowInfo, unit) {
         const data = new google.visualization.DataTable();
         data.addColumn('datetime', 'Timestamp');
         data.addColumn('number', `TX (${unit})`);
+        data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
         data.addColumn('number', `RX (${unit})`);
+        data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
 
         const divisor = {
             MB: 1024 ** 2,
@@ -1162,11 +1170,26 @@ function drawChart(chartData, windowInfo, unit) {
             EB: 1024 ** 6
         }[unit] || 1024 ** 3;
 
-        data.addRows(chartData.map((point) => [
-            new Date(String(point.hour).replace(' ', 'T')),
-            Number(point.tx || 0) / divisor,
-            Number(point.rx || 0) / divisor
-        ]));
+        data.addRows(chartData.map((point) => {
+            const timestamp = formatTimestamp(point.hour);
+            const tx = Number(point.tx || 0) / divisor;
+            const rx = Number(point.rx || 0) / divisor;
+            const tooltip = `
+                <div class="chart-tooltip">
+                    <div class="chart-tooltip-title">${escapeHtml(timestamp)}</div>
+                    <div class="chart-tooltip-line tx">Upload: ${escapeHtml(formatTraffic(point.tx || 0, unit))}</div>
+                    <div class="chart-tooltip-line rx">Download: ${escapeHtml(formatTraffic(point.rx || 0, unit))}</div>
+                </div>
+            `;
+
+            return [
+                new Date(String(point.hour).replace(' ', 'T')),
+                tx,
+                tooltip,
+                rx,
+                tooltip
+            ];
+        }));
 
         const dashboard = new google.visualization.Dashboard(document.getElementById('dashboard_div'));
         const chart = new google.visualization.ChartWrapper({
@@ -1194,7 +1217,10 @@ function drawChart(chartData, windowInfo, unit) {
                     baselineColor: chartLine
                 },
                 explorer: { axis: 'horizontal', keepInBounds: true },
-                tooltip: { textStyle: { color: chartText } }
+                tooltip: {
+                    isHtml: true,
+                    textStyle: { color: chartText }
+                }
             }
         });
 
