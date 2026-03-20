@@ -432,9 +432,6 @@ Reference screenshot from the older UI:
 
 ## Inspired By
 
-https://github.com/muhannad0/mikrotik-traffic-counter
-
-## Acknowledgements
-
+- https://github.com/muhannad0/mikrotik-traffic-counter
 - [tikstat](https://github.com/mrkrasser/tikstat) project
 - [Mikrotik: WAN Data Monitoring via Scripting](https://aacable.wordpress.com/2015/03/09/5386/) by Syed Janazaib
