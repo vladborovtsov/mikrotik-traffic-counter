@@ -617,7 +617,7 @@ function renderSparkline(container, chartData, options = {}) {
             ></circle>
         `;
     }).join('');
-    const timelineLabels = buildTimelineLabels(chartData, timelineMode);
+    const timelineLabels = buildTimelineLabels(chartData, timelineMode, plotWidth);
 
     container.innerHTML = `
         <div class="sparkline-body">
@@ -706,18 +706,18 @@ function renderSparkline(container, chartData, options = {}) {
     });
 }
 
-function buildTimelineLabels(chartData, mode = 'time') {
+function buildTimelineLabels(chartData, mode = 'time', plotWidth = 0) {
     if (!Array.isArray(chartData) || chartData.length === 0) {
         return [];
     }
 
-    const indices = chartData.length === 1
+    const preferredCount = plotWidth >= 520 ? 7 : plotWidth >= 320 ? 5 : 3;
+    const labelCount = Math.max(1, Math.min(preferredCount, chartData.length));
+    const indices = labelCount === 1
         ? [0]
-        : Array.from(new Set([
-            0,
-            Math.max(0, Math.floor((chartData.length - 1) / 2)),
-            chartData.length - 1
-        ]));
+        : Array.from(new Set(Array.from({ length: labelCount }, (_, index) => (
+            Math.round((index * (chartData.length - 1)) / (labelCount - 1))
+        ))));
 
     return indices.map((index) => formatTimelineLabel(chartData[index]?.hour || '', mode));
 }
@@ -1099,6 +1099,7 @@ function renderStatCard(key, title, payload, unit, anchor, includeRange = true) 
             <div>TX: ${escapeHtml(formatTraffic(stats.sumtx, unit))}</div>
             <div>RX: ${escapeHtml(formatTraffic(stats.sumrx, unit))}</div>
             <div>Total: ${escapeHtml(formatTraffic(total, unit))}</div>
+            <div class="stat-card-action-chip">Click for details</div>
         </button>
     `;
 }

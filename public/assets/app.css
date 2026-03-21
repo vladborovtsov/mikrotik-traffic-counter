@@ -395,6 +395,26 @@ button:hover {
     margin-bottom: 12px;
 }
 
+
+.stat-card-action-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 12px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-soft) 76%, var(--panel));
+    color: var(--accent-strong);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.stat-card-button:hover .stat-card-action-chip,
+.stat-card-button:focus-visible .stat-card-action-chip {
+    background: color-mix(in srgb, var(--accent-soft) 92%, var(--panel));
+}
+
 .chart-card {
     min-height: 320px;
 }

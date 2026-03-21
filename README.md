@@ -391,6 +391,8 @@ Recommended validation before production use:
    - per-interface selection works
    - charts update without reload
    - rename/comment updates persist
+   - the four footer stats on the device detail page open drill-down breakdown views
+   - daily opens hourly breakdown charts, while weekly, monthly, and total open multi-chart pages with unit switching and older/newer navigation
 5. Repeat with auth enabled.
 6. Repeat with source IP allowlisting enabled.
 7. Switch to MySQL config and run `docker compose --profile mysql up --build`.

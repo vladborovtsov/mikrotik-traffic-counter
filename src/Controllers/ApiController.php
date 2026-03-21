@@ -651,11 +651,11 @@ final class ApiController
                 'title' => 'Week of ' . $weekStart->format('d/m/Y'),
                 'subtitle' => $weekStart->format('d/m/Y') . ' to ' . $weekEnd->format('d/m/Y'),
                 'timeline_mode' => 'day',
-                'chart_data' => $this->trafficService->getChartDataForGranularity(
+                'chart_data' => $this->trafficService->getChartDataForBucketMinutes(
                     $device->id,
                     $weekStart->format('Y-m-d H:i:s'),
                     $weekEnd->format('Y-m-d H:i:s'),
-                    'day',
+                    360,
                     $interfaceId
                 ),
                 'totals' => $this->trafficService->getSumStats(
@@ -701,11 +701,11 @@ final class ApiController
                 'title' => $monthStart->format('F Y'),
                 'subtitle' => $monthStart->format('d/m/Y') . ' to ' . $monthEnd->format('d/m/Y'),
                 'timeline_mode' => 'day',
-                'chart_data' => $this->trafficService->getChartDataForGranularity(
+                'chart_data' => $this->trafficService->getChartDataForBucketMinutes(
                     $device->id,
                     $monthStart->format('Y-m-d H:i:s'),
                     $monthEnd->format('Y-m-d H:i:s'),
-                    'day',
+                    4320,
                     $interfaceId
                 ),
                 'totals' => $this->trafficService->getSumStats(
@@ -754,12 +754,12 @@ final class ApiController
                 $groups[] = [
                     'title' => (string) $year,
                     'subtitle' => 'January to December ' . (string) $year,
-                    'timeline_mode' => 'month',
-                    'chart_data' => $this->trafficService->getChartDataForGranularity(
+                    'timeline_mode' => 'day',
+                    'chart_data' => $this->trafficService->getChartDataForBucketMinutes(
                         $device->id,
                         $yearStart->format('Y-m-d H:i:s'),
                         $yearEnd->format('Y-m-d H:i:s'),
-                        'month',
+                        10080,
                         $interfaceId
                     ),
                     'totals' => $this->trafficService->getSumStats(
