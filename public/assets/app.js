@@ -378,7 +378,7 @@ function renderDeviceList(devices) {
         const selectedInterfaceId = String(device.home_interface_id || '');
         const interfaces = Array.isArray(device.interfaces) ? device.interfaces : [];
         const interfaceList = interfaces.length
-            ? interfaces.map((item) => `<span class="interface-chip">${escapeHtml(item.display_name || item.name)}</span>`).join('')
+            ? interfaces.map((item) => `<button class="interface-chip interface-chip-button" type="button" data-open-device-interface="${device.id}" data-interface-id="${item.id}">${escapeHtml(item.display_name || item.name)}</button>`).join('')
             : '<span class="meta">No interfaces yet.</span>';
         return `
         <div class="device-item" data-device-card="${device.id}">
@@ -464,6 +464,21 @@ function renderDeviceList(devices) {
                 deviceId: button.getAttribute('data-open-device'),
                 interfaceId: null,
                 offset: 0
+            });
+        });
+    });
+
+    app.querySelectorAll('[data-open-device-interface]').forEach((button) => {
+        button.addEventListener('click', () => {
+            navigate({
+                deviceId: button.getAttribute('data-open-device-interface'),
+                interfaceId: button.getAttribute('data-interface-id') || null,
+                offset: 0,
+                statsView: null,
+                statsOffset: 0,
+                statsAnchor: null,
+                settingsDeviceId: null,
+                appSettings: false,
             });
         });
     });

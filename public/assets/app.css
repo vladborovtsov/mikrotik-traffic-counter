@@ -620,6 +620,21 @@ button:hover {
     line-height: 1;
 }
 
+.interface-chip-button {
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.interface-chip-button:hover,
+.interface-chip-button:focus-visible {
+    background: color-mix(in srgb, var(--accent-soft) 75%, var(--panel));
+    color: var(--text);
+    outline: none;
+    transform: translateY(-1px);
+}
+
 .traffic-pair {
     display: flex;
     justify-content: space-between;
