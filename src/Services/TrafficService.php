@@ -175,40 +175,43 @@ final class TrafficService
         string $end,
         int $bucketMinutes,
         ?int $interfaceId = null
-    ): array
-    {
+    ): array {
         $bucketExpression = $bucketMinutes === 60
             ? $this->database->hourlyBucketExpression('recorded_at')
             : $this->database->bucketExpression('recorded_at', $bucketMinutes);
-        $sql = "SELECT {$bucketExpression} AS hour, SUM(delta_tx) AS tx, SUM(delta_rx) AS rx
-            FROM traffic_samples
-            WHERE device_id = :device_id AND recorded_at >= :start AND recorded_at <= :end";
-        $params = [
-            ':device_id' => $deviceId,
-            ':start' => $start,
-            ':end' => $end,
-        ];
 
-        if ($interfaceId !== null) {
-            $sql .= ' AND interface_id = :interface_id';
-            $params[':interface_id'] = $interfaceId;
-        }
+        return $this->getChartDataByExpression($bucketExpression, $deviceId, $start, $end, $interfaceId);
+    }
 
-        $sql .= ' GROUP BY hour ORDER BY hour ASC';
-
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-
-        $chartData = [];
-        while ($row = $stmt->fetch()) {
-            $chartData[] = [
-                'hour' => (string) $row['hour'],
-                'tx' => floatval($row['tx'] ?? 0),
-                'rx' => floatval($row['rx'] ?? 0),
-            ];
-        }
-
-        return $chartData;
+    /**
+     * @return array<int, array{hour: string, tx: float, rx: float}>
+     */
+    public function getChartDataForGranularity(
+        int $deviceId,
+        string $start,
+        string $end,
+        string $granularity,
+        ?int $interfaceId = null
+    ): array {
+        return match ($granularity) {
+            '10min' => $this->getChartDataForBucketMinutes($deviceId, $start, $end, 10, $interfaceId),
+            'hour' => $this->getChartData($deviceId, $start, $end, $interfaceId),
+            'day' => $this->getChartDataByExpression(
+                $this->database->dailyBucketExpression('recorded_at'),
+                $deviceId,
+                $start,
+                $end,
+                $interfaceId
+            ),
+            'month' => $this->getChartDataByExpression(
+                $this->database->monthlyBucketExpression('recorded_at'),
+                $deviceId,
+                $start,
+                $end,
+                $interfaceId
+            ),
+            default => $this->getChartData($deviceId, $start, $end, $interfaceId),
+        };
     }
 
     /**
@@ -263,5 +266,78 @@ final class TrafficService
             'sumtx' => floatval($row['sumtx'] ?? 0),
             'sumrx' => floatval($row['sumrx'] ?? 0),
         ];
+    }
+
+    /**
+     * @return array{min_year: int, max_year: int}|null
+     */
+    public function getYearBounds(int $deviceId, ?int $interfaceId = null): ?array
+    {
+        $sql = 'SELECT MIN(recorded_at) AS min_recorded_at, MAX(recorded_at) AS max_recorded_at
+            FROM traffic_samples WHERE device_id = :device_id';
+        $params = [
+            ':device_id' => $deviceId,
+        ];
+
+        if ($interfaceId !== null) {
+            $sql .= ' AND interface_id = :interface_id';
+            $params[':interface_id'] = $interfaceId;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch();
+        $minRecordedAt = $row['min_recorded_at'] ?? null;
+        $maxRecordedAt = $row['max_recorded_at'] ?? null;
+
+        if (!$minRecordedAt || !$maxRecordedAt) {
+            return null;
+        }
+
+        return [
+            'min_year' => (int) date('Y', strtotime((string) $minRecordedAt)),
+            'max_year' => (int) date('Y', strtotime((string) $maxRecordedAt)),
+        ];
+    }
+
+    /**
+     * @return array<int, array{hour: string, tx: float, rx: float}>
+     */
+    private function getChartDataByExpression(
+        string $bucketExpression,
+        int $deviceId,
+        string $start,
+        string $end,
+        ?int $interfaceId = null
+    ): array {
+        $sql = "SELECT {$bucketExpression} AS hour, SUM(delta_tx) AS tx, SUM(delta_rx) AS rx
+            FROM traffic_samples
+            WHERE device_id = :device_id AND recorded_at >= :start AND recorded_at <= :end";
+        $params = [
+            ':device_id' => $deviceId,
+            ':start' => $start,
+            ':end' => $end,
+        ];
+
+        if ($interfaceId !== null) {
+            $sql .= ' AND interface_id = :interface_id';
+            $params[':interface_id'] = $interfaceId;
+        }
+
+        $sql .= ' GROUP BY hour ORDER BY hour ASC';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $chartData = [];
+        while ($row = $stmt->fetch()) {
+            $chartData[] = [
+                'hour' => (string) $row['hour'],
+                'tx' => floatval($row['tx'] ?? 0),
+                'rx' => floatval($row['rx'] ?? 0),
+            ];
+        }
+
+        return $chartData;
     }
 }

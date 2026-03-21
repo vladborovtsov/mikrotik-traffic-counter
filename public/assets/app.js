@@ -18,6 +18,9 @@ function readStateFromUrl() {
         settingsDeviceId: params.get('settings_id'),
         appSettings: params.get('settings') === 'app',
         interfaceId: params.get('interface_id'),
+        statsView: params.get('stats_view'),
+        statsOffset: parseInt(params.get('stats_offset') || '0', 10) || 0,
+        statsAnchor: params.get('stats_anchor'),
         windowHours: parseInt(params.get('window') || '48', 10) || 48,
         offset: parseInt(params.get('offset') || '0', 10) || 0,
         unit: params.get('unit') || 'GB'
@@ -30,6 +33,9 @@ function persistState(replace = false) {
     if (state.settingsDeviceId) params.set('settings_id', state.settingsDeviceId);
     if (state.appSettings) params.set('settings', 'app');
     if (state.interfaceId) params.set('interface_id', state.interfaceId);
+    if (state.statsView) params.set('stats_view', state.statsView);
+    if (state.statsOffset !== 0) params.set('stats_offset', String(state.statsOffset));
+    if (state.statsAnchor) params.set('stats_anchor', state.statsAnchor);
     if (state.windowHours !== 48) params.set('window', String(state.windowHours));
     if (state.offset !== 0) params.set('offset', String(state.offset));
     if (state.unit !== 'GB') params.set('unit', state.unit);
@@ -51,8 +57,21 @@ function resetToList() {
         settingsDeviceId: null,
         appSettings: false,
         interfaceId: null,
+        statsView: null,
+        statsOffset: 0,
+        statsAnchor: null,
         windowHours: 48,
         offset: 0
+    });
+}
+
+function resetToDetail() {
+    navigate({
+        settingsDeviceId: null,
+        appSettings: false,
+        statsView: null,
+        statsOffset: 0,
+        statsAnchor: null
     });
 }
 
@@ -203,6 +222,19 @@ async function render() {
             return;
         }
 
+        if (state.deviceId && state.statsView) {
+            const statsDrilldown = await fetchJson({
+                action: 'getStatsDrilldown',
+                id: state.deviceId,
+                interface_id: state.interfaceId || '',
+                stats_view: state.statsView,
+                stats_offset: state.statsOffset,
+                stats_anchor: state.statsAnchor || ''
+            });
+            renderStatsDrilldown(statsDrilldown);
+            return;
+        }
+
         if (!state.deviceId) {
             const devices = await fetchJson({ action: 'getDevices' });
             deviceListCache = devices.map((device) => ({
@@ -238,7 +270,7 @@ async function render() {
 }
 
 function syncHeaderNavigation() {
-    const showBackButton = Boolean(state.deviceId || state.settingsDeviceId || state.appSettings);
+    const showBackButton = Boolean(state.deviceId || state.settingsDeviceId || state.appSettings || state.statsView);
     if (headerBackButton) {
         headerBackButton.hidden = !showBackButton;
     }
@@ -500,15 +532,22 @@ function renderDeviceList(devices) {
     });
 }
 
-function renderSparkline(container, chartData) {
+function renderSparkline(container, chartData, options = {}) {
+    const showTotals = options.showTotals !== false;
+    const showLegend = options.showLegend !== false;
+    const fluidWidth = options.fluidWidth === true;
+    const measuredWidth = Math.round(container.getBoundingClientRect().width || container.clientWidth || 0);
+    const width = fluidWidth ? Math.max(measuredWidth || 300, 220) : (options.width || 300);
+    const height = options.height || 92;
+    const padding = options.padding || 8;
+    const timelineMode = options.timelineMode || 'time';
+    const emptyMessage = options.emptyMessage || 'No recent data.';
+
     if (!Array.isArray(chartData) || chartData.length === 0) {
-        container.innerHTML = '<div class="meta">No recent data.</div>';
+        container.innerHTML = `<div class="meta">${escapeHtml(emptyMessage)}</div>`;
         return;
     }
 
-    const width = 300;
-    const height = 92;
-    const padding = 8;
     const plotWidth = width - (padding * 2);
     const txColor = getCssVariable('--spark-tx', '#1b63d8');
     const rxColor = getCssVariable('--spark-rx', '#c63b4f');
@@ -519,7 +558,7 @@ function renderSparkline(container, chartData) {
     const maxValue = Math.max(...values, 0);
 
     if (maxValue <= 0) {
-        container.innerHTML = '<div class="meta">No recent traffic.</div>';
+        container.innerHTML = `<div class="meta">${escapeHtml(options.emptyTrafficMessage || 'No recent traffic.')}</div>`;
         return;
     }
 
@@ -578,7 +617,7 @@ function renderSparkline(container, chartData) {
             ></circle>
         `;
     }).join('');
-    const timelineLabels = buildTimelineLabels(chartData);
+    const timelineLabels = buildTimelineLabels(chartData, timelineMode);
 
     container.innerHTML = `
         <div class="sparkline-body">
@@ -600,29 +639,33 @@ function renderSparkline(container, chartData) {
                     </div>
                 </div>
             </div>
-            <div class="sparkline-totals">
-                <div class="sparkline-total-block">
-                    <strong>Total up</strong>
-                    <span>${escapeHtml(formatTraffic(txTotal, state.unit))}</span>
+            ${showTotals ? `
+                <div class="sparkline-totals">
+                    <div class="sparkline-total-block">
+                        <strong>Total up</strong>
+                        <span>${escapeHtml(formatTraffic(txTotal, state.unit))}</span>
+                    </div>
+                    <div class="sparkline-total-block">
+                        <strong>Total down</strong>
+                        <span>${escapeHtml(formatTraffic(rxTotal, state.unit))}</span>
+                    </div>
+                    <div class="sparkline-total-block">
+                        <strong>Max up</strong>
+                        <span>${escapeHtml(formatTraffic(txMax, state.unit))}</span>
+                    </div>
+                    <div class="sparkline-total-block">
+                        <strong>Max down</strong>
+                        <span>${escapeHtml(formatTraffic(rxMax, state.unit))}</span>
+                    </div>
                 </div>
-                <div class="sparkline-total-block">
-                    <strong>Total down</strong>
-                    <span>${escapeHtml(formatTraffic(rxTotal, state.unit))}</span>
-                </div>
-                <div class="sparkline-total-block">
-                    <strong>Max up</strong>
-                    <span>${escapeHtml(formatTraffic(txMax, state.unit))}</span>
-                </div>
-                <div class="sparkline-total-block">
-                    <strong>Max down</strong>
-                    <span>${escapeHtml(formatTraffic(rxMax, state.unit))}</span>
-                </div>
+            ` : ''}
+        </div>
+        ${showLegend ? `
+            <div class="sparkline-legend">
+                <span><i class="swatch tx"></i>Upload</span>
+                <span><i class="swatch rx"></i>Download</span>
             </div>
-        </div>
-        <div class="sparkline-legend">
-            <span><i class="swatch tx"></i>Upload</span>
-            <span><i class="swatch rx"></i>Download</span>
-        </div>
+        ` : ''}
     `;
 
     const tooltip = container.querySelector('.sparkline-tooltip');
@@ -663,7 +706,7 @@ function renderSparkline(container, chartData) {
     });
 }
 
-function buildTimelineLabels(chartData) {
+function buildTimelineLabels(chartData, mode = 'time') {
     if (!Array.isArray(chartData) || chartData.length === 0) {
         return [];
     }
@@ -676,10 +719,10 @@ function buildTimelineLabels(chartData) {
             chartData.length - 1
         ]));
 
-    return indices.map((index) => formatTimelineLabel(chartData[index]?.hour || ''));
+    return indices.map((index) => formatTimelineLabel(chartData[index]?.hour || '', mode));
 }
 
-function formatTimelineLabel(value) {
+function formatTimelineLabel(value, mode = 'time') {
     if (!value) {
         return '';
     }
@@ -687,6 +730,19 @@ function formatTimelineLabel(value) {
     const date = parseSqlDate(value);
     if (!date) {
         return String(value);
+    }
+
+    if (mode === 'day') {
+        return new Intl.DateTimeFormat('en-GB', {
+            day: '2-digit',
+            month: '2-digit'
+        }).format(date);
+    }
+
+    if (mode === 'month') {
+        return new Intl.DateTimeFormat('en-GB', {
+            month: 'short'
+        }).format(date);
     }
 
     return new Intl.DateTimeFormat('en-GB', {
@@ -835,10 +891,10 @@ function renderDeviceDetail(detail) {
             </div>
 
             <div class="stats-grid">
-                ${renderStatCard('Daily', stats.daily, state.unit)}
-                ${renderStatCard('Weekly', stats.weekly, state.unit)}
-                ${renderStatCard('Monthly', stats.monthly, state.unit)}
-                ${renderStatCard('Total', stats.total, state.unit, false)}
+                ${renderStatCard('daily', 'Daily', stats.daily, state.unit, detail.window.end)}
+                ${renderStatCard('weekly', 'Weekly', stats.weekly, state.unit, detail.window.end)}
+                ${renderStatCard('monthly', 'Monthly', stats.monthly, state.unit, detail.window.end)}
+                ${renderStatCard('total', 'Total', stats.total, state.unit, detail.window.end, false)}
             </div>
         </div>
     `;
@@ -846,6 +902,99 @@ function renderDeviceDetail(detail) {
     bindGlobalActions();
     bindDetailActions(device.id);
     drawChart(detail.chartData, detail.window, state.unit);
+}
+
+function renderStatsDrilldown(payload) {
+    const device = payload.device;
+    const groups = payload.groups || [];
+    const interfaces = payload.interfaces || [];
+    const selectedInterfaceId = payload.selected_interface_id ? String(payload.selected_interface_id) : '';
+    const selectedInterface = selectedInterfaceId
+        ? interfaces.find((item) => String(item.id) === selectedInterfaceId)
+        : null;
+    const subtitle = selectedInterface
+        ? `Serial ${escapeHtml(device.sn)} · interface ${escapeHtml(selectedInterface.display_name || selectedInterface.name || 'selected')}`
+        : `Serial ${escapeHtml(device.sn)} · all interfaces`;
+
+    app.innerHTML = `
+        <div class="device-summary detail-layout">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="detail-title-row">
+                        <div>
+                            <h2 class="panel-title">${escapeHtml(payload.page_title || 'Traffic breakdown')}</h2>
+                            <p class="panel-subtitle">${subtitle}</p>
+                        </div>
+                        <button class="btn-secondary" data-action="back-to-detail" type="button">Back to detail</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="drilldown-toolbar">
+                        <div class="toolbar-group">
+                            <label for="drilldownUnitSelector">Units</label>
+                            <select id="drilldownUnitSelector">
+                                ${['MB', 'GB', 'TB', 'PB', 'EB'].map((unit) => `<option value="${unit}" ${unit === state.unit ? 'selected' : ''}>${unit}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="drilldown-nav">
+                            <button class="btn-secondary" data-shift-stats="older" ${payload.can_go_older === false ? 'disabled' : ''}>Older</button>
+                            ${payload.can_go_newer ? '<button class="btn-secondary" data-shift-stats="current">Current</button><button class="btn-secondary" data-shift-stats="newer">Newer</button>' : ''}
+                        </div>
+                    </div>
+                    <p class="panel-subtitle drilldown-intro">${escapeHtml(payload.page_subtitle || '')}</p>
+                    ${groups.length ? `
+                        <div class="drilldown-grid drilldown-grid-${escapeHtml(payload.stats_view || 'daily')}">
+                            ${groups.map((group, index) => {
+                                const totals = group.totals || {};
+                                const totalTraffic = Number(totals.sumtx || 0) + Number(totals.sumrx || 0);
+                                return `
+                                <div class="drilldown-card">
+                                    <div class="drilldown-card-head">
+                                        <h3>${escapeHtml(group.title || `Plot ${index + 1}`)}</h3>
+                                        <p>${escapeHtml(group.subtitle || '')}</p>
+                                    </div>
+                                    <div class="drilldown-chart" data-drilldown-chart='${escapeHtml(JSON.stringify(group.chart_data || []))}' data-timeline-mode="${escapeHtml(group.timeline_mode || 'time')}"></div>
+                                    <div class="drilldown-totals">
+                                        <div class="drilldown-total-block tx">
+                                            <strong>Total up</strong>
+                                            <span>${escapeHtml(formatTraffic(totals.sumtx || 0, state.unit))}</span>
+                                        </div>
+                                        <div class="drilldown-total-block rx">
+                                            <strong>Total down</strong>
+                                            <span>${escapeHtml(formatTraffic(totals.sumrx || 0, state.unit))}</span>
+                                        </div>
+                                        <div class="drilldown-total-block total">
+                                            <strong>Total traffic</strong>
+                                            <span>${escapeHtml(formatTraffic(totalTraffic, state.unit))}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;}).join('')}
+                        </div>
+                    ` : '<div class="meta">No traffic samples are available for this view.</div>'}
+                </div>
+            </div>
+        </div>
+    `;
+
+    bindGlobalActions();
+    bindStatsDrilldownActions();
+    app.querySelectorAll('[data-drilldown-chart]').forEach((node) => {
+        const raw = node.getAttribute('data-drilldown-chart') || '[]';
+        const timelineMode = node.getAttribute('data-timeline-mode') || 'time';
+        try {
+            renderSparkline(node, JSON.parse(raw), {
+                showTotals: false,
+                showLegend: false,
+                fluidWidth: true,
+                height: 110,
+                emptyMessage: 'No traffic in this range.',
+                timelineMode,
+            });
+        } catch {
+            node.innerHTML = '<div class="meta">Chart unavailable.</div>';
+        }
+    });
 }
 
 function renderDeviceSettings(payload) {
@@ -938,19 +1087,19 @@ function renderGlobalSettingsPage() {
     syncThemeSelector();
 }
 
-function renderStatCard(title, payload, unit, includeRange = true) {
+function renderStatCard(key, title, payload, unit, anchor, includeRange = true) {
     const stats = payload.data;
     const total = Number(stats.sumtx || 0) + Number(stats.sumrx || 0);
-    const range = includeRange ? `<div class="meta">${escapeHtml(formatDateRange(payload.range.from, payload.range.to))}</div>` : '';
+    const range = includeRange && payload.range ? `<div class="meta">${escapeHtml(formatDateRange(payload.range.from, payload.range.to))}</div>` : '';
 
     return `
-        <div class="stat-card">
+        <button class="stat-card stat-card-button" type="button" data-open-stats="${escapeHtml(key)}" data-stats-anchor="${escapeHtml(anchor || '')}">
             <h3>${escapeHtml(title)}</h3>
             ${range}
             <div>TX: ${escapeHtml(formatTraffic(stats.sumtx, unit))}</div>
             <div>RX: ${escapeHtml(formatTraffic(stats.sumrx, unit))}</div>
             <div>Total: ${escapeHtml(formatTraffic(total, unit))}</div>
-        </div>
+        </button>
     `;
 }
 
@@ -964,7 +1113,10 @@ function bindGlobalActions() {
             navigate({
                 settingsDeviceId: button.getAttribute('data-open-settings'),
                 deviceId: null,
-                interfaceId: null
+                interfaceId: null,
+                statsView: null,
+                statsOffset: 0,
+                statsAnchor: null
             });
         });
     });
@@ -979,6 +1131,9 @@ function bindGlobalActions() {
                 deviceId: button.getAttribute('data-open-device'),
                 settingsDeviceId: null,
                 interfaceId: null,
+                statsView: null,
+                statsOffset: 0,
+                statsAnchor: null,
                 offset: 0
             });
         });
@@ -996,6 +1151,10 @@ function bindGlobalActions() {
             }
         });
     });
+
+    app.querySelectorAll('[data-action="back-to-detail"]').forEach((button) => {
+        button.addEventListener('click', resetToDetail);
+    });
 }
 
 function bindHeaderActions() {
@@ -1004,6 +1163,11 @@ function bindHeaderActions() {
     });
 
     headerBackButton?.addEventListener('click', () => {
+        if (state.statsView) {
+            resetToDetail();
+            return;
+        }
+
         resetToList();
     });
 
@@ -1013,6 +1177,9 @@ function bindHeaderActions() {
             deviceId: null,
             settingsDeviceId: null,
             interfaceId: null,
+            statsView: null,
+            statsOffset: 0,
+            statsAnchor: null,
             offset: 0
         });
     });
@@ -1128,6 +1295,37 @@ function bindDetailActions(deviceId) {
         navigate({ unit: event.target.value }, true);
     });
 
+    app.querySelectorAll('[data-open-stats]').forEach((button) => {
+        button.addEventListener('click', () => {
+            navigate({
+                deviceId: String(deviceId),
+                statsView: button.getAttribute('data-open-stats'),
+                statsOffset: 0,
+                statsAnchor: button.getAttribute('data-stats-anchor') || null,
+                settingsDeviceId: null,
+                appSettings: false,
+            });
+        });
+    });
+}
+
+function bindStatsDrilldownActions() {
+    document.getElementById('drilldownUnitSelector')?.addEventListener('change', (event) => {
+        navigate({ unit: event.target.value }, true);
+    });
+
+    app.querySelectorAll('[data-shift-stats]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const direction = button.getAttribute('data-shift-stats');
+            if (direction === 'older') {
+                navigate({ statsOffset: state.statsOffset + 1 });
+            } else if (direction === 'newer' && state.statsOffset > 0) {
+                navigate({ statsOffset: state.statsOffset - 1 });
+            } else if (direction === 'current') {
+                navigate({ statsOffset: 0 });
+            }
+        });
+    });
 }
 
 function drawChart(chartData, windowInfo, unit) {

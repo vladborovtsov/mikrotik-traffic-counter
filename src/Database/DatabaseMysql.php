@@ -34,6 +34,16 @@ final class DatabaseMysql extends Database
         return $this->hourlyBucketExpression($column);
     }
 
+    public function dailyBucketExpression(string $column): string
+    {
+        return sprintf("DATE_FORMAT(%s, '%%Y-%%m-%%d 00:00:00')", $column);
+    }
+
+    public function monthlyBucketExpression(string $column): string
+    {
+        return sprintf("DATE_FORMAT(%s, '%%Y-%%m-01 00:00:00')", $column);
+    }
+
     public function initializeSchema(): void
     {
         if ($this->tableExists('devices') && !$this->columnExists('devices', 'serial_number')) {

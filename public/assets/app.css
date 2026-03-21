@@ -374,6 +374,18 @@ button:hover {
     padding: 16px;
 }
 
+.stat-card-button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    color: inherit;
+    cursor: pointer;
+}
+
+.stat-card-button:hover {
+    transform: translateY(-1px);
+}
+
 .stat-card h3 {
     margin: 0 0 8px;
     font-size: 1rem;
@@ -385,6 +397,140 @@ button:hover {
 
 .chart-card {
     min-height: 320px;
+}
+
+.drilldown-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+}
+
+.drilldown-nav {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.drilldown-intro {
+    margin-top: 16px;
+}
+
+.drilldown-grid {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+}
+
+.drilldown-grid-daily {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.drilldown-grid-weekly,
+.drilldown-grid-monthly,
+.drilldown-grid-total {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.drilldown-card {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(180deg, var(--panel) 0%, color-mix(in srgb, var(--panel-alt) 72%, var(--panel)) 100%);
+    padding: 14px;
+}
+
+.drilldown-card-head h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.drilldown-card-head p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.drilldown-chart {
+    min-width: 0;
+    margin-top: 12px;
+}
+
+.drilldown-chart .sparkline-body {
+    gap: 0;
+}
+
+.drilldown-chart .sparkline-visual {
+    justify-content: stretch;
+}
+
+.drilldown-chart .sparkline-frame {
+    width: 100%;
+    max-width: 100%;
+    background: color-mix(in srgb, var(--panel-alt) 50%, transparent);
+    border-radius: 14px;
+    padding: 8px 8px 10px;
+}
+
+.drilldown-chart .sparkline-svg {
+    display: block;
+}
+
+.drilldown-chart .sparkline-timeline {
+    margin-top: 8px;
+}
+
+.drilldown-totals {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.drilldown-total-block {
+    display: grid;
+    gap: 3px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    text-align: center;
+    background: color-mix(in srgb, var(--panel-alt) 88%, var(--panel));
+}
+
+.drilldown-total-block strong {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.drilldown-total-block span {
+    font-size: 0.86rem;
+    color: var(--text);
+}
+
+.drilldown-total-block.tx {
+    background: color-mix(in srgb, var(--spark-tx) 12%, transparent);
+}
+
+.drilldown-total-block.tx strong {
+    color: var(--spark-tx);
+}
+
+.drilldown-total-block.rx {
+    background: color-mix(in srgb, var(--spark-rx) 12%, transparent);
+}
+
+.drilldown-total-block.rx strong {
+    color: var(--spark-rx);
+}
+
+.drilldown-total-block.total {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.drilldown-total-block.total strong {
+    color: var(--accent-strong);
 }
 
 .split {
@@ -550,6 +696,7 @@ button:hover {
 .sparkline-frame {
     position: relative;
     width: min(300px, 100%);
+    max-width: 100%;
 }
 
 .sparkline-svg {
@@ -807,5 +954,16 @@ div.google-visualization-tooltip span {
 
     .hero-actions {
         justify-content: flex-start;
+    }
+}
+
+
+@media (max-width: 900px) {
+    .drilldown-grid-daily {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .drilldown-totals {
+        grid-template-columns: minmax(0, 1fr);
     }
 }

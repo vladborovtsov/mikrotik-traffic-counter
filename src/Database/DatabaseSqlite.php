@@ -34,6 +34,16 @@ final class DatabaseSqlite extends Database
         return $this->hourlyBucketExpression($column);
     }
 
+    public function dailyBucketExpression(string $column): string
+    {
+        return sprintf("strftime('%%Y-%%m-%%d 00:00:00', %s)", $column);
+    }
+
+    public function monthlyBucketExpression(string $column): string
+    {
+        return sprintf("strftime('%%Y-%%m-01 00:00:00', %s)", $column);
+    }
+
     public function initializeSchema(): void
     {
         if ($this->tableExists('devices') && !$this->columnExists('devices', 'serial_number')) {

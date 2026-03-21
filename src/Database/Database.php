@@ -37,6 +37,10 @@ abstract class Database
 
     abstract public function bucketExpression(string $column, int $minutes): string;
 
+    abstract public function dailyBucketExpression(string $column): string;
+
+    abstract public function monthlyBucketExpression(string $column): string;
+
     abstract public function initializeSchema(): void;
 
     abstract protected function connect(): PDO;

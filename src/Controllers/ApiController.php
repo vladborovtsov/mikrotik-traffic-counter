@@ -36,6 +36,7 @@ final class ApiController
             'getGlobalSettings' => $this->getGlobalSettings(),
             'updateGlobalSettings' => $this->updateGlobalSettings(),
             'getDeviceOverview' => $this->getDeviceOverview(),
+            'getStatsDrilldown' => $this->getStatsDrilldown(),
             'getDeviceSettings' => $this->getDeviceSettings(),
             'getDevice', 'getDeviceData' => $this->getDeviceData(),
             'listInterfaces' => $this->listInterfaces(),
@@ -267,6 +268,50 @@ final class ApiController
         ]);
     }
 
+    private function getStatsDrilldown(): Response
+    {
+        $id = $this->request->intQuery('id');
+        if ($id === null || $id < 1) {
+            return Response::json(['error' => 'Invalid ID'], 400);
+        }
+
+        $device = $this->deviceService->getDeviceById($id);
+        if ($device === null) {
+            return Response::json(['error' => 'Device not found'], 404);
+        }
+
+        $statsView = strtolower(trim((string) $this->request->query('stats_view', '')));
+        if (!in_array($statsView, ['daily', 'weekly', 'monthly', 'total'], true)) {
+            return Response::json(['error' => 'Invalid stats_view'], 400);
+        }
+
+        $statsOffset = $this->request->intQuery('stats_offset') ?? 0;
+        if ($statsOffset < 0 || $statsOffset > 3650) {
+            return Response::json(['error' => 'Invalid stats_offset'], 400);
+        }
+
+        $interfaceId = $this->request->intQuery('interface_id');
+        if ($interfaceId !== null) {
+            $selectedInterface = $this->interfaceService->getById($interfaceId);
+            if ($selectedInterface === null || $selectedInterface->deviceId !== $id) {
+                return Response::json(['error' => 'Interface not found'], 404);
+            }
+        }
+
+        $anchor = $this->resolveStatsAnchor();
+        $interfaces = array_map(
+            static fn ($interface) => $interface->toArray(),
+            $this->interfaceService->listByDeviceId($id)
+        );
+
+        return Response::json(match ($statsView) {
+            'daily' => $this->buildDailyDrilldown($device, $interfaces, $interfaceId, $anchor, $statsOffset),
+            'weekly' => $this->buildWeeklyDrilldown($device, $interfaces, $interfaceId, $anchor, $statsOffset),
+            'monthly' => $this->buildMonthlyDrilldown($device, $interfaces, $interfaceId, $anchor, $statsOffset),
+            'total' => $this->buildTotalDrilldown($device, $interfaces, $interfaceId, $statsOffset),
+        });
+    }
+
     private function getDeviceSettings(): Response
     {
         $id = $this->request->intQuery('id');
@@ -439,6 +484,20 @@ final class ApiController
         ];
     }
 
+    private function resolveStatsAnchor(): DateTime
+    {
+        $rawAnchor = trim((string) $this->request->query('stats_anchor', ''));
+        if ($rawAnchor === '') {
+            return new DateTime();
+        }
+
+        try {
+            return new DateTime($rawAnchor);
+        } catch (\Exception) {
+            throw new InvalidRequestException('Invalid stats_anchor');
+        }
+    }
+
     /**
      * @return array<string, int|float|string|null>
      */
@@ -507,6 +566,223 @@ final class ApiController
             $now->format('Y-m-d H:i:s'),
             (string) $hours,
             10,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $interfaces
+     * @return array<string, mixed>
+     */
+    private function buildDailyDrilldown(Device $device, array $interfaces, ?int $interfaceId, DateTime $anchor, int $statsOffset): array
+    {
+        $selectedDay = clone $anchor;
+        if ($statsOffset > 0) {
+            $selectedDay->modify('-' . $statsOffset . ' days');
+        }
+
+        $dayStart = clone $selectedDay;
+        $dayStart->setTime(0, 0, 0);
+        $groups = [];
+        for ($hour = 0; $hour < 24; $hour++) {
+            $hourStart = clone $dayStart;
+            $hourStart->setTime($hour, 0, 0);
+            $hourEnd = clone $hourStart;
+            $hourEnd->setTime($hour, 59, 59);
+
+            $groups[] = [
+                'title' => $hourStart->format('H:00') . ' - ' . $hourStart->format('H:59'),
+                'subtitle' => $hourStart->format('d/m/Y'),
+                'timeline_mode' => 'time',
+                'chart_data' => $this->trafficService->getChartDataForGranularity(
+                    $device->id,
+                    $hourStart->format('Y-m-d H:i:s'),
+                    $hourEnd->format('Y-m-d H:i:s'),
+                    '10min',
+                    $interfaceId
+                ),
+                'totals' => $this->trafficService->getSumStats(
+                    $device->id,
+                    $hourStart->format('Y-m-d H:i:s'),
+                    $hourEnd->format('Y-m-d H:i:s'),
+                    $interfaceId
+                ),
+            ];
+        }
+
+        return [
+            'device' => $this->presentDevice($device, [], null, $interfaceId, $interfaces),
+            'interfaces' => $interfaces,
+            'selected_interface_id' => $interfaceId,
+            'stats_view' => 'daily',
+            'stats_offset' => $statsOffset,
+            'stats_anchor' => $anchor->format('Y-m-d H:i:s'),
+            'page_title' => 'Daily breakdown',
+            'page_subtitle' => '24 hourly charts for ' . $selectedDay->format('d/m/Y'),
+            'can_go_newer' => $statsOffset > 0,
+            'can_go_older' => true,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $interfaces
+     * @return array<string, mixed>
+     */
+    private function buildWeeklyDrilldown(Device $device, array $interfaces, ?int $interfaceId, DateTime $anchor, int $statsOffset): array
+    {
+        $selectedWeek = clone $anchor;
+        if ($statsOffset > 0) {
+            $selectedWeek->modify('-' . ($statsOffset * 4) . ' weeks');
+        }
+        $selectedWeek->modify('Monday this week');
+        $selectedWeek->setTime(0, 0, 0);
+
+        $groups = [];
+        for ($index = 0; $index < 4; $index++) {
+            $weekStart = clone $selectedWeek;
+            if ($index > 0) {
+                $weekStart->modify('-' . $index . ' weeks');
+            }
+            $weekEnd = clone $weekStart;
+            $weekEnd->modify('Sunday this week');
+            $weekEnd->setTime(23, 59, 59);
+
+            $groups[] = [
+                'title' => 'Week of ' . $weekStart->format('d/m/Y'),
+                'subtitle' => $weekStart->format('d/m/Y') . ' to ' . $weekEnd->format('d/m/Y'),
+                'timeline_mode' => 'day',
+                'chart_data' => $this->trafficService->getChartDataForGranularity(
+                    $device->id,
+                    $weekStart->format('Y-m-d H:i:s'),
+                    $weekEnd->format('Y-m-d H:i:s'),
+                    'day',
+                    $interfaceId
+                ),
+                'totals' => $this->trafficService->getSumStats(
+                    $device->id,
+                    $weekStart->format('Y-m-d H:i:s'),
+                    $weekEnd->format('Y-m-d H:i:s'),
+                    $interfaceId
+                ),
+            ];
+        }
+
+        return [
+            'device' => $this->presentDevice($device, [], null, $interfaceId, $interfaces),
+            'interfaces' => $interfaces,
+            'selected_interface_id' => $interfaceId,
+            'stats_view' => 'weekly',
+            'stats_offset' => $statsOffset,
+            'stats_anchor' => $anchor->format('Y-m-d H:i:s'),
+            'page_title' => 'Weekly breakdown',
+            'page_subtitle' => 'Selected week plus previous 3 weeks',
+            'can_go_newer' => $statsOffset > 0,
+            'can_go_older' => true,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $interfaces
+     * @return array<string, mixed>
+     */
+    private function buildMonthlyDrilldown(Device $device, array $interfaces, ?int $interfaceId, DateTime $anchor, int $statsOffset): array
+    {
+        $year = (int) $anchor->format('Y') - $statsOffset;
+        $groups = [];
+
+        for ($month = 1; $month <= 12; $month++) {
+            $monthStart = new DateTime(sprintf('%04d-%02d-01 00:00:00', $year, $month));
+            $monthEnd = clone $monthStart;
+            $monthEnd->modify('last day of this month');
+            $monthEnd->setTime(23, 59, 59);
+
+            $groups[] = [
+                'title' => $monthStart->format('F Y'),
+                'subtitle' => $monthStart->format('d/m/Y') . ' to ' . $monthEnd->format('d/m/Y'),
+                'timeline_mode' => 'day',
+                'chart_data' => $this->trafficService->getChartDataForGranularity(
+                    $device->id,
+                    $monthStart->format('Y-m-d H:i:s'),
+                    $monthEnd->format('Y-m-d H:i:s'),
+                    'day',
+                    $interfaceId
+                ),
+                'totals' => $this->trafficService->getSumStats(
+                    $device->id,
+                    $monthStart->format('Y-m-d H:i:s'),
+                    $monthEnd->format('Y-m-d H:i:s'),
+                    $interfaceId
+                ),
+            ];
+        }
+
+        return [
+            'device' => $this->presentDevice($device, [], null, $interfaceId, $interfaces),
+            'interfaces' => $interfaces,
+            'selected_interface_id' => $interfaceId,
+            'stats_view' => 'monthly',
+            'stats_offset' => $statsOffset,
+            'stats_anchor' => $anchor->format('Y-m-d H:i:s'),
+            'page_title' => 'Monthly breakdown',
+            'page_subtitle' => '12 monthly charts for ' . (string) $year,
+            'can_go_newer' => $statsOffset > 0,
+            'can_go_older' => true,
+            'groups' => $groups,
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $interfaces
+     * @return array<string, mixed>
+     */
+    private function buildTotalDrilldown(Device $device, array $interfaces, ?int $interfaceId, int $statsOffset): array
+    {
+        $yearBounds = $this->trafficService->getYearBounds($device->id, $interfaceId);
+        $groups = [];
+        $canGoOlder = false;
+
+        if ($yearBounds !== null) {
+            $latestYear = $yearBounds['max_year'] - ($statsOffset * 4);
+            $oldestYearOnPage = max($yearBounds['min_year'], $latestYear - 3);
+            $canGoOlder = $oldestYearOnPage > $yearBounds['min_year'];
+
+            for ($year = $latestYear; $year >= $oldestYearOnPage; $year--) {
+                $yearStart = new DateTime(sprintf('%04d-01-01 00:00:00', $year));
+                $yearEnd = new DateTime(sprintf('%04d-12-31 23:59:59', $year));
+
+                $groups[] = [
+                    'title' => (string) $year,
+                    'subtitle' => 'January to December ' . (string) $year,
+                    'timeline_mode' => 'month',
+                    'chart_data' => $this->trafficService->getChartDataForGranularity(
+                        $device->id,
+                        $yearStart->format('Y-m-d H:i:s'),
+                        $yearEnd->format('Y-m-d H:i:s'),
+                        'month',
+                        $interfaceId
+                    ),
+                    'totals' => $this->trafficService->getSumStats(
+                        $device->id,
+                        $yearStart->format('Y-m-d H:i:s'),
+                        $yearEnd->format('Y-m-d H:i:s'),
+                        $interfaceId
+                    ),
+                ];
+            }
+        }
+
+        return [
+            'device' => $this->presentDevice($device, [], null, $interfaceId, $interfaces),
+            'interfaces' => $interfaces,
+            'selected_interface_id' => $interfaceId,
+            'stats_view' => 'total',
+            'stats_offset' => $statsOffset,
+            'page_title' => 'Yearly breakdown',
+            'page_subtitle' => 'Up to 4 years per page',
+            'can_go_newer' => $statsOffset > 0,
+            'can_go_older' => $canGoOlder,
+            'groups' => $groups,
         ];
     }
 
