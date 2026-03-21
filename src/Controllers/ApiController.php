@@ -37,6 +37,7 @@ final class ApiController
             'updateGlobalSettings' => $this->updateGlobalSettings(),
             'getDeviceOverview' => $this->getDeviceOverview(),
             'getStatsDrilldown' => $this->getStatsDrilldown(),
+            'exportCsv' => $this->exportCsv(),
             'getDeviceSettings' => $this->getDeviceSettings(),
             'getDevice', 'getDeviceData' => $this->getDeviceData(),
             'listInterfaces' => $this->listInterfaces(),
@@ -783,6 +784,177 @@ final class ApiController
             'can_go_older' => $canGoOlder,
             'groups' => $groups,
         ];
+    }
+
+
+    private function exportCsv(): Response
+    {
+        $id = $this->request->intQuery('id');
+        if ($id === null || $id < 1) {
+            return Response::json(['error' => 'Invalid ID'], 400);
+        }
+
+        $device = $this->deviceService->getDeviceById($id);
+        if ($device === null) {
+            return Response::json(['error' => 'Device not found'], 404);
+        }
+
+        $interfaceId = $this->request->intQuery('interface_id');
+        $selectedInterface = null;
+        if ($interfaceId !== null) {
+            $selectedInterface = $this->interfaceService->getById($interfaceId);
+            if ($selectedInterface === null || $selectedInterface->deviceId !== $id) {
+                return Response::json(['error' => 'Interface not found'], 404);
+            }
+        }
+
+        $exportContext = strtolower(trim((string) $this->request->query('export_context', 'detail')));
+        if (!in_array($exportContext, ['detail', 'stats'], true)) {
+            return Response::json(['error' => 'Invalid export_context'], 400);
+        }
+
+        if ($exportContext === 'detail') {
+            $window = $this->getValidatedWindowHours();
+            $offset = $this->getValidatedOffset();
+            $endDate = new DateTime();
+            if ($offset > 0) {
+                $endDate->modify('-' . ($offset * $window) . ' hours');
+            }
+            $startDate = clone $endDate;
+            $startDate->modify('-' . $window . ' hours');
+
+            $chartData = $this->trafficService->getChartData(
+                $device->id,
+                $startDate->format('Y-m-d H:i:s'),
+                $endDate->format('Y-m-d H:i:s'),
+                $interfaceId
+            );
+
+            $headers = ['device_serial', 'device_name', 'interface', 'window_start', 'window_end', 'sample_timestamp', 'tx_bytes', 'rx_bytes'];
+            $rows = array_map(
+                fn (array $point): array => [
+                    $device->serialNumber,
+                    $device->name ?? '',
+                    $selectedInterface?->displayName ?? $selectedInterface?->name ?? 'all',
+                    $startDate->format('Y-m-d H:i:s'),
+                    $endDate->format('Y-m-d H:i:s'),
+                    (string) ($point['hour'] ?? ''),
+                    (string) (float) ($point['tx'] ?? 0),
+                    (string) (float) ($point['rx'] ?? 0),
+                ],
+                $chartData
+            );
+
+            return Response::csv(
+                $this->buildCsv($headers, $rows),
+                $this->buildCsvFilename($device->serialNumber, 'detail')
+            );
+        }
+
+        $statsView = strtolower(trim((string) $this->request->query('stats_view', '')));
+        if (!in_array($statsView, ['daily', 'weekly', 'monthly', 'total'], true)) {
+            return Response::json(['error' => 'Invalid stats_view'], 400);
+        }
+
+        $statsOffset = $this->request->intQuery('stats_offset') ?? 0;
+        if ($statsOffset < 0 || $statsOffset > 3650) {
+            return Response::json(['error' => 'Invalid stats_offset'], 400);
+        }
+
+        $exportMode = strtolower(trim((string) $this->request->query('export_mode', 'points')));
+        if (!in_array($exportMode, ['points', 'summary'], true)) {
+            return Response::json(['error' => 'Invalid export_mode'], 400);
+        }
+
+        $anchor = $this->resolveStatsAnchor();
+        $interfaces = array_map(
+            static fn ($interface) => $interface->toArray(),
+            $this->interfaceService->listByDeviceId($id)
+        );
+
+        $payload = match ($statsView) {
+            'daily' => $this->buildDailyDrilldown($device, $interfaces, $interfaceId, $anchor, $statsOffset),
+            'weekly' => $this->buildWeeklyDrilldown($device, $interfaces, $interfaceId, $anchor, $statsOffset),
+            'monthly' => $this->buildMonthlyDrilldown($device, $interfaces, $interfaceId, $anchor, $statsOffset),
+            'total' => $this->buildTotalDrilldown($device, $interfaces, $interfaceId, $statsOffset),
+        };
+
+        if ($exportMode === 'summary') {
+            $headers = ['device_serial', 'device_name', 'interface', 'stats_view', 'group_title', 'group_subtitle', 'total_tx_bytes', 'total_rx_bytes', 'total_bytes'];
+            $rows = array_map(
+                fn (array $group): array => [
+                    $device->serialNumber,
+                    $device->name ?? '',
+                    $selectedInterface?->displayName ?? $selectedInterface?->name ?? 'all',
+                    $statsView,
+                    (string) ($group['title'] ?? ''),
+                    (string) ($group['subtitle'] ?? ''),
+                    (string) (float) (($group['totals']['sumtx'] ?? 0)),
+                    (string) (float) (($group['totals']['sumrx'] ?? 0)),
+                    (string) (float) ((($group['totals']['sumtx'] ?? 0) + ($group['totals']['sumrx'] ?? 0))),
+                ],
+                $payload['groups'] ?? []
+            );
+
+            return Response::csv(
+                $this->buildCsv($headers, $rows),
+                $this->buildCsvFilename($device->serialNumber, $statsView . '-summary')
+            );
+        }
+
+        $headers = ['device_serial', 'device_name', 'interface', 'stats_view', 'group_title', 'group_subtitle', 'point_timestamp', 'tx_bytes', 'rx_bytes'];
+        $rows = [];
+        foreach (($payload['groups'] ?? []) as $group) {
+            foreach (($group['chart_data'] ?? []) as $point) {
+                $rows[] = [
+                    $device->serialNumber,
+                    $device->name ?? '',
+                    $selectedInterface?->displayName ?? $selectedInterface?->name ?? 'all',
+                    $statsView,
+                    (string) ($group['title'] ?? ''),
+                    (string) ($group['subtitle'] ?? ''),
+                    (string) ($point['hour'] ?? ''),
+                    (string) (float) ($point['tx'] ?? 0),
+                    (string) (float) ($point['rx'] ?? 0),
+                ];
+            }
+        }
+
+        return Response::csv(
+            $this->buildCsv($headers, $rows),
+            $this->buildCsvFilename($device->serialNumber, $statsView . '-points')
+        );
+    }
+
+    /**
+     * @param list<string> $headers
+     * @param list<list<string>> $rows
+     */
+    private function buildCsv(array $headers, array $rows): string
+    {
+        $handle = fopen('php://temp', 'r+');
+        if ($handle === false) {
+            throw new \RuntimeException('Unable to build CSV');
+        }
+
+        fputcsv($handle, $headers);
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+
+        rewind($handle);
+        $csv = (string) stream_get_contents($handle);
+        fclose($handle);
+
+        return $csv;
+    }
+
+    private function buildCsvFilename(string $serial, string $suffix): string
+    {
+        $safeSerial = preg_replace('/[^A-Za-z0-9_-]+/', '-', $serial) ?: 'device';
+        $safeSuffix = preg_replace('/[^A-Za-z0-9_-]+/', '-', $suffix) ?: 'export';
+
+        return sprintf('mikstat-%s-%s-%s.csv', $safeSerial, $safeSuffix, gmdate('Ymd-His'));
     }
 
     private function plainAwareError(string $jsonMessage, string $plainMessage, int $statusCode): Response

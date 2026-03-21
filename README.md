@@ -296,6 +296,8 @@ Current API actions:
 - `collect`
 - `getDevices`
 - `getDeviceData`
+- `getStatsDrilldown`
+- `exportCsv`
 - `listInterfaces`
 - `renameDevice`
 - `updateDevice`
@@ -306,11 +308,16 @@ Useful examples:
 ```text
 /api.php?action=getDevices
 /api.php?action=getDeviceData&id=1&interface_id=2&window=48&offset=0
+/api.php?action=getStatsDrilldown&id=1&interface_id=2&stats_view=weekly&stats_offset=0
+/api.php?action=exportCsv&export_context=detail&id=1&interface_id=2&window=48&offset=0
+/api.php?action=exportCsv&export_context=stats&id=1&interface_id=2&stats_view=weekly&stats_offset=0&export_mode=summary
 /api.php?action=updateDevice&id=1&name=Office%20Router&comment=WAN%20uplink
 ```
 
 Notes:
 
+- The UI exposes CSV export from the device detail page and the daily/weekly/monthly/yearly breakdown pages through a dedicated export page.
+- `exportCsv` returns raw byte values in CSV, not formatted MB/GB/TB strings.
 - `window` defaults to `DEFAULT_WINDOW_HOURS`
 - `window` is bounded to prevent excessively heavy queries
 - `offset` pages through older windows of the same size

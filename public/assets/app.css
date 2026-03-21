@@ -343,6 +343,15 @@ button:hover {
     color: #fff;
 }
 
+.export-download-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 11px 14px;
+    text-decoration: none;
+}
+
 .btn-secondary {
     background: var(--panel-alt);
     color: var(--text);

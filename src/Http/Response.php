@@ -45,6 +45,20 @@ final class Response
         );
     }
 
+    public static function csv(string $payload, string $filename, int $statusCode = 200): self
+    {
+        return new self(
+            $payload,
+            $statusCode,
+            [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="' . addcslashes($filename, "\"\\") . '"',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+            ]
+        );
+    }
+
     public function send(): never
     {
         http_response_code($this->statusCode);

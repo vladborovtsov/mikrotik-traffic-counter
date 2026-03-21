@@ -21,6 +21,8 @@ function readStateFromUrl() {
         statsView: params.get('stats_view'),
         statsOffset: parseInt(params.get('stats_offset') || '0', 10) || 0,
         statsAnchor: params.get('stats_anchor'),
+        exportPage: params.get('export'),
+        exportMode: params.get('export_mode') || 'points',
         windowHours: parseInt(params.get('window') || '48', 10) || 48,
         offset: parseInt(params.get('offset') || '0', 10) || 0,
         unit: params.get('unit') || 'GB'
@@ -36,6 +38,8 @@ function persistState(replace = false) {
     if (state.statsView) params.set('stats_view', state.statsView);
     if (state.statsOffset !== 0) params.set('stats_offset', String(state.statsOffset));
     if (state.statsAnchor) params.set('stats_anchor', state.statsAnchor);
+    if (state.exportPage) params.set('export', state.exportPage);
+    if (state.exportMode && state.exportMode !== 'points') params.set('export_mode', state.exportMode);
     if (state.windowHours !== 48) params.set('window', String(state.windowHours));
     if (state.offset !== 0) params.set('offset', String(state.offset));
     if (state.unit !== 'GB') params.set('unit', state.unit);
@@ -60,6 +64,8 @@ function resetToList() {
         statsView: null,
         statsOffset: 0,
         statsAnchor: null,
+        exportPage: null,
+        exportMode: 'points',
         windowHours: 48,
         offset: 0
     });
@@ -73,7 +79,16 @@ function resetToDetail() {
         interfaceId: restoredInterfaceId !== null ? restoredInterfaceId : state.interfaceId,
         statsView: null,
         statsOffset: 0,
-        statsAnchor: null
+        statsAnchor: null,
+        exportPage: null,
+        exportMode: 'points'
+    });
+}
+
+function resetToSourceFromExport() {
+    navigate({
+        exportPage: null,
+        exportMode: 'points'
     });
 }
 
@@ -263,6 +278,19 @@ async function render() {
             return;
         }
 
+        if (state.deviceId && state.exportPage === 'stats' && state.statsView) {
+            const statsDrilldown = await fetchJson({
+                action: 'getStatsDrilldown',
+                id: state.deviceId,
+                interface_id: state.interfaceId || '',
+                stats_view: state.statsView,
+                stats_offset: state.statsOffset,
+                stats_anchor: state.statsAnchor || ''
+            });
+            renderExportPage('stats', statsDrilldown);
+            return;
+        }
+
         if (state.deviceId && state.statsView) {
             const statsDrilldown = await fetchJson({
                 action: 'getStatsDrilldown',
@@ -297,6 +325,10 @@ async function render() {
         }
 
         const detail = await fetchJson(request);
+        if (state.exportPage === 'detail') {
+            renderExportPage('detail', detail);
+            return;
+        }
         renderDeviceDetail(detail);
     } catch (error) {
         syncHeaderNavigation();
@@ -311,7 +343,7 @@ async function render() {
 }
 
 function syncHeaderNavigation() {
-    const showBackButton = Boolean(state.deviceId || state.settingsDeviceId || state.appSettings || state.statsView);
+    const showBackButton = Boolean(state.deviceId || state.settingsDeviceId || state.appSettings || state.statsView || state.exportPage);
     if (headerBackButton) {
         headerBackButton.hidden = !showBackButton;
     }
@@ -928,6 +960,7 @@ function renderDeviceDetail(detail) {
                         <button class="btn-secondary" data-shift-window="older">Older</button>
                         ${state.offset > 0 ? '<button class="btn-secondary" data-shift-window="current">Current</button>' : ''}
                         ${state.offset > 0 ? '<button class="btn-secondary" data-shift-window="newer">Newer</button>' : ''}
+                        <button class="btn-secondary" data-open-export="detail" type="button">Export CSV</button>
                     </div>
                 </div>
             </div>
@@ -1002,6 +1035,7 @@ function renderStatsDrilldown(payload) {
                         <div class="drilldown-nav">
                             <button class="btn-secondary" data-shift-stats="older" ${payload.can_go_older === false ? 'disabled' : ''}>Older</button>
                             ${payload.can_go_newer ? '<button class="btn-secondary" data-shift-stats="current">Current</button><button class="btn-secondary" data-shift-stats="newer">Newer</button>' : ''}
+                            <button class="btn-secondary" data-open-export="stats" type="button">Export CSV</button>
                         </div>
                     </div>
                     <p class="panel-subtitle drilldown-intro">${escapeHtml(payload.page_subtitle || '')}</p>
@@ -1058,6 +1092,120 @@ function renderStatsDrilldown(payload) {
             node.innerHTML = '<div class="meta">Chart unavailable.</div>';
         }
     });
+}
+
+
+function buildExportDownloadUrl(exportContext, exportMode = 'points') {
+    const params = new URLSearchParams();
+    params.set('action', 'exportCsv');
+    params.set('export_context', exportContext);
+    if (state.deviceId) {
+        params.set('id', state.deviceId);
+    }
+    if (state.interfaceId) {
+        params.set('interface_id', state.interfaceId);
+    }
+
+    if (exportContext === 'detail') {
+        params.set('window', String(state.windowHours));
+        params.set('offset', String(state.offset));
+    } else {
+        if (state.statsView) {
+            params.set('stats_view', state.statsView);
+        }
+        params.set('stats_offset', String(state.statsOffset));
+        if (state.statsAnchor) {
+            params.set('stats_anchor', state.statsAnchor);
+        }
+        params.set('export_mode', exportMode);
+    }
+
+    return `api.php?${params.toString()}`;
+}
+
+function renderExportPage(exportContext, payload) {
+    const device = payload.device;
+    const interfaces = payload.interfaces || [];
+    const selectedInterfaceId = payload.selected_interface_id ? String(payload.selected_interface_id) : '';
+    const selectedInterface = selectedInterfaceId
+        ? interfaces.find((item) => String(item.id) === selectedInterfaceId)
+        : null;
+    const interfaceLabel = selectedInterface
+        ? (selectedInterface.display_name || selectedInterface.name || 'selected')
+        : 'All interfaces';
+    const sourceLabel = exportContext === 'stats'
+        ? `${payload.page_title || 'Breakdown'} CSV export`
+        : 'Detail CSV export';
+    const mode = exportContext === 'stats' ? (state.exportMode || 'points') : 'points';
+    const groups = payload.groups || [];
+    const pointCount = exportContext === 'stats'
+        ? groups.reduce((sum, group) => sum + ((group.chart_data || []).length), 0)
+        : (payload.chartData || []).length;
+    const summaryCount = exportContext === 'stats' ? groups.length : 0;
+    const primaryDescription = exportContext === 'stats'
+        ? (mode === 'summary'
+            ? `One CSV row per visible ${state.statsView || 'breakdown'} card.`
+            : `One CSV row per plotted point across ${pointCount} visible points.`)
+        : `One CSV row per plotted point in the current detail chart (${pointCount} points).`;
+
+    app.innerHTML = `
+        <div class="device-summary detail-layout">
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="detail-title-row">
+                        <div>
+                            <h2 class="panel-title">${escapeHtml(sourceLabel)}</h2>
+                            <p class="panel-subtitle">${escapeHtml(device.name || device.sn)} · Serial ${escapeHtml(device.sn)} · ${escapeHtml(interfaceLabel)}</p>
+                        </div>
+                        <button class="btn-secondary" data-action="back-from-export" type="button">Back</button>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="summary-grid export-summary-grid">
+                        <div class="summary-tile">
+                            <strong>Source</strong>
+                            ${escapeHtml(exportContext === 'stats' ? (payload.page_title || 'Breakdown') : 'Device detail')}
+                        </div>
+                        <div class="summary-tile">
+                            <strong>Current context</strong>
+                            ${escapeHtml(exportContext === 'stats' ? (payload.page_subtitle || '') : (payload.window.offset === 0 ? `Last ${payload.window.length} hours` : formatDateRange(payload.window.start, payload.window.end)))}
+                        </div>
+                        <div class="summary-tile">
+                            <strong>CSV rows</strong>
+                            ${escapeHtml(String(exportContext === 'stats' && mode === 'summary' ? summaryCount : pointCount))}
+                        </div>
+                        <div class="summary-tile">
+                            <strong>Shape</strong>
+                            ${escapeHtml(exportContext === 'stats' ? (mode === 'summary' ? 'Summary cards' : 'Series points') : 'Series points')}
+                        </div>
+                    </div>
+                    <div class="form-grid export-form-grid">
+                        ${exportContext === 'stats' ? `
+                            <div class="toolbar-group export-mode-group">
+                                <label for="exportModeSelector">Breakdown CSV shape</label>
+                                <select id="exportModeSelector">
+                                    <option value="points" ${mode === 'points' ? 'selected' : ''}>Series points</option>
+                                    <option value="summary" ${mode === 'summary' ? 'selected' : ''}>Summary cards</option>
+                                </select>
+                            </div>
+                        ` : ''}
+                        <div class="summary-tile export-description-tile">
+                            <strong>What will be exported</strong>
+                            <div class="meta">${escapeHtml(primaryDescription)}</div>
+                            ${exportContext === 'stats' ? `<div class="meta">Visible groups: ${escapeHtml(String(summaryCount))}</div>` : ''}
+                        </div>
+                        <div class="button-row">
+                            <a class="btn-primary export-download-link" href="${escapeHtml(buildExportDownloadUrl(exportContext, mode))}">Download CSV</a>
+                            <button class="btn-secondary" data-action="back-from-export" type="button">Back</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    bindGlobalActions();
+    bindExportActions(exportContext);
 }
 
 function renderDeviceSettings(payload) {
@@ -1219,6 +1367,19 @@ function bindGlobalActions() {
     app.querySelectorAll('[data-action="back-to-detail"]').forEach((button) => {
         button.addEventListener('click', resetToDetail);
     });
+
+    app.querySelectorAll('[data-action="back-from-export"]').forEach((button) => {
+        button.addEventListener('click', resetToSourceFromExport);
+    });
+
+    app.querySelectorAll('[data-open-export]').forEach((button) => {
+        button.addEventListener('click', () => {
+            navigate({
+                exportPage: button.getAttribute('data-open-export'),
+                exportMode: 'points'
+            });
+        });
+    });
 }
 
 function bindHeaderActions() {
@@ -1227,6 +1388,11 @@ function bindHeaderActions() {
     });
 
     headerBackButton?.addEventListener('click', () => {
+        if (state.exportPage) {
+            resetToSourceFromExport();
+            return;
+        }
+
         if (state.statsView) {
             resetToDetail();
             return;
@@ -1371,6 +1537,16 @@ function bindDetailActions(deviceId) {
                 appSettings: false,
             });
         });
+    });
+}
+
+
+function bindExportActions(exportContext) {
+    document.getElementById('exportModeSelector')?.addEventListener('change', (event) => {
+        if (exportContext !== 'stats') {
+            return;
+        }
+        navigate({ exportMode: event.target.value || 'points' }, true);
     });
 }
 
