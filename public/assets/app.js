@@ -66,9 +66,11 @@ function resetToList() {
 }
 
 function resetToDetail() {
+    const restoredInterfaceId = loadDetailInterfaceContext(state.deviceId);
     navigate({
         settingsDeviceId: null,
         appSettings: false,
+        interfaceId: restoredInterfaceId !== null ? restoredInterfaceId : state.interfaceId,
         statsView: null,
         statsOffset: 0,
         statsAnchor: null
@@ -99,6 +101,45 @@ function saveJsonStorage(key, value) {
     } catch {
         // Ignore storage failures.
     }
+}
+
+function saveSessionValue(key, value) {
+    try {
+        if (value === null || value === undefined || value === '') {
+            window.sessionStorage.removeItem(key);
+            return;
+        }
+        window.sessionStorage.setItem(key, String(value));
+    } catch {
+        // Ignore storage failures.
+    }
+}
+
+function loadSessionValue(key) {
+    try {
+        return window.sessionStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function detailInterfaceContextKey(deviceId) {
+    return `mikstat.detailInterface.${deviceId}`;
+}
+
+function saveDetailInterfaceContext(deviceId, interfaceId) {
+    if (!deviceId) {
+        return;
+    }
+    saveSessionValue(detailInterfaceContextKey(deviceId), interfaceId || '');
+}
+
+function loadDetailInterfaceContext(deviceId) {
+    if (!deviceId) {
+        return null;
+    }
+    const value = loadSessionValue(detailInterfaceContextKey(deviceId));
+    return value || null;
 }
 
 function parseSqlDate(value) {
@@ -931,6 +972,13 @@ function renderStatsDrilldown(payload) {
                 <div class="panel-body">
                     <div class="drilldown-toolbar">
                         <div class="toolbar-group">
+                            <label for="drilldownInterfaceSelector">Interface</label>
+                            <select id="drilldownInterfaceSelector">
+                                <option value="" ${selectedInterfaceId === '' ? 'selected' : ''}>All interfaces</option>
+                                ${interfaces.map((item) => `<option value="${item.id}" ${String(item.id) === selectedInterfaceId ? 'selected' : ''}>${escapeHtml(item.display_name || item.name || `Interface ${item.id}`)}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="toolbar-group">
                             <label for="drilldownUnitSelector">Units</label>
                             <select id="drilldownUnitSelector">
                                 ${['MB', 'GB', 'TB', 'PB', 'EB'].map((unit) => `<option value="${unit}" ${unit === state.unit ? 'selected' : ''}>${unit}</option>`).join('')}
@@ -1298,6 +1346,7 @@ function bindDetailActions(deviceId) {
 
     app.querySelectorAll('[data-open-stats]').forEach((button) => {
         button.addEventListener('click', () => {
+            saveDetailInterfaceContext(String(deviceId), state.interfaceId || null);
             navigate({
                 deviceId: String(deviceId),
                 statsView: button.getAttribute('data-open-stats'),
@@ -1311,6 +1360,10 @@ function bindDetailActions(deviceId) {
 }
 
 function bindStatsDrilldownActions() {
+    document.getElementById('drilldownInterfaceSelector')?.addEventListener('change', (event) => {
+        navigate({ interfaceId: event.target.value || null }, true);
+    });
+
     document.getElementById('drilldownUnitSelector')?.addEventListener('change', (event) => {
         navigate({ unit: event.target.value }, true);
     });
