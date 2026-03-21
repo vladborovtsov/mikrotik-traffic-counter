@@ -163,7 +163,35 @@ final class TrafficService
      */
     public function getChartData(int $deviceId, string $start, string $end, ?int $interfaceId = null): array
     {
-        return $this->getChartDataForBucketMinutes($deviceId, $start, $end, 60, $interfaceId);
+        $sql = 'SELECT recorded_at AS hour, delta_tx AS tx, delta_rx AS rx
+            FROM traffic_samples
+            WHERE device_id = :device_id AND recorded_at >= :start AND recorded_at <= :end';
+        $params = [
+            ':device_id' => $deviceId,
+            ':start' => $start,
+            ':end' => $end,
+        ];
+
+        if ($interfaceId !== null) {
+            $sql .= ' AND interface_id = :interface_id';
+            $params[':interface_id'] = $interfaceId;
+        }
+
+        $sql .= ' ORDER BY recorded_at ASC, id ASC';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+
+        $chartData = [];
+        while ($row = $stmt->fetch()) {
+            $chartData[] = [
+                'hour' => (string) $row['hour'],
+                'tx' => floatval($row['tx'] ?? 0),
+                'rx' => floatval($row['rx'] ?? 0),
+            ];
+        }
+
+        return $chartData;
     }
 
     /**

@@ -593,11 +593,10 @@ final class ApiController
                 'title' => $hourStart->format('H:00') . ' - ' . $hourStart->format('H:59'),
                 'subtitle' => $hourStart->format('d/m/Y'),
                 'timeline_mode' => 'time',
-                'chart_data' => $this->trafficService->getChartDataForGranularity(
+                'chart_data' => $this->trafficService->getChartData(
                     $device->id,
                     $hourStart->format('Y-m-d H:i:s'),
                     $hourEnd->format('Y-m-d H:i:s'),
-                    '10min',
                     $interfaceId
                 ),
                 'totals' => $this->trafficService->getSumStats(
