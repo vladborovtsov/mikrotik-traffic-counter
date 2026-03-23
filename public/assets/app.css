@@ -562,6 +562,82 @@ button:hover {
     color: var(--accent-strong);
 }
 
+.detail-window-totals {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    display: grid;
+    gap: 12px;
+}
+
+.detail-window-totals-head {
+    display: grid;
+    gap: 4px;
+}
+
+.detail-window-totals-head h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.detail-window-totals-head p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.detail-window-totals-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.detail-window-total-block {
+    display: grid;
+    gap: 4px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--panel-alt) 88%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+}
+
+.detail-window-total-block strong {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.detail-window-total-block span {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.detail-window-total-block.tx {
+    background: color-mix(in srgb, var(--spark-tx) 12%, transparent);
+}
+
+.detail-window-total-block.tx strong {
+    color: var(--spark-tx);
+}
+
+.detail-window-total-block.rx {
+    background: color-mix(in srgb, var(--spark-rx) 12%, transparent);
+}
+
+.detail-window-total-block.rx strong {
+    color: var(--spark-rx);
+}
+
+.detail-window-total-block.total {
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.detail-window-total-block.total strong {
+    color: var(--accent-strong);
+}
+
 .split {
     display: grid;
     grid-template-columns: 2fr 1fr;
@@ -1007,6 +1083,7 @@ div.google-visualization-tooltip span {
         grid-template-columns: minmax(0, 1fr);
     }
 
+    .detail-window-totals-grid,
     .drilldown-totals {
         grid-template-columns: minmax(0, 1fr);
     }

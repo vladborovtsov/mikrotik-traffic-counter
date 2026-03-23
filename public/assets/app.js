@@ -881,6 +881,7 @@ async function refreshDeviceOverview(deviceId) {
 function renderDeviceDetail(detail) {
     const device = detail.device;
     const stats = detail.stats;
+    const windowTotals = detail.window_totals || { data: { sumtx: 0, sumrx: 0 }, range: { from: detail.window.start, to: detail.window.end } };
     const interfaces = detail.interfaces || [];
     const selectedInterfaceId = detail.selected_interface_id ? String(detail.selected_interface_id) : '';
 
@@ -976,6 +977,7 @@ function renderDeviceDetail(detail) {
                         <div id="filter_div" style="width: 100%; height: 96px;"></div>
                     </div>
                     <div id="chart_empty" class="chart-empty" style="display: none;">No traffic samples in the selected range.</div>
+                    ${renderWindowTotals(windowTotals, state.unit)}
                 </div>
             </div>
 
@@ -991,6 +993,36 @@ function renderDeviceDetail(detail) {
     bindGlobalActions();
     bindDetailActions(device.id);
     drawChart(detail.chartData, detail.window, state.unit);
+}
+
+
+function renderWindowTotals(payload, unit) {
+    const stats = payload?.data || {};
+    const total = Number(stats.sumtx || 0) + Number(stats.sumrx || 0);
+    const range = payload?.range || {};
+
+    return `
+        <div class="detail-window-totals">
+            <div class="detail-window-totals-head">
+                <h3>Selected window totals</h3>
+                <p>${escapeHtml(formatDateRange(range.from || '', range.to || ''))}</p>
+            </div>
+            <div class="detail-window-totals-grid">
+                <div class="detail-window-total-block tx">
+                    <strong>TX</strong>
+                    <span>${escapeHtml(formatTraffic(stats.sumtx || 0, unit))}</span>
+                </div>
+                <div class="detail-window-total-block rx">
+                    <strong>RX</strong>
+                    <span>${escapeHtml(formatTraffic(stats.sumrx || 0, unit))}</span>
+                </div>
+                <div class="detail-window-total-block total">
+                    <strong>Total</strong>
+                    <span>${escapeHtml(formatTraffic(total, unit))}</span>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function renderStatsDrilldown(payload) {

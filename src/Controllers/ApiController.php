@@ -190,6 +190,8 @@ final class ApiController
         $weeklyRange = $this->getWeekRangeFor($endDate);
         $monthlyFrom = $endDate->format('Y-m-01 00:00:00');
         $monthlyTo = $endDate->format('Y-m-t 23:59:59');
+        $windowFrom = $startDate->format('Y-m-d H:i:s');
+        $windowTo = $endDate->format('Y-m-d H:i:s');
 
         return Response::json([
             'device' => $this->presentDevice($device, [], null, $interfaceId),
@@ -200,10 +202,14 @@ final class ApiController
             'selected_interface_id' => $interfaceId,
             'chartData' => $this->trafficService->getChartData(
                 $id,
-                $startDate->format('Y-m-d H:i:s'),
-                $endDate->format('Y-m-d H:i:s'),
+                $windowFrom,
+                $windowTo,
                 $interfaceId
             ),
+            'window_totals' => [
+                'data' => $this->trafficService->getSumStats($id, $windowFrom, $windowTo, $interfaceId),
+                'range' => ['from' => $windowFrom, 'to' => $windowTo],
+            ],
             'stats' => [
                 'daily' => [
                     'data' => $this->trafficService->getSumStats($id, $dailyFrom, $dailyTo, $interfaceId),
@@ -222,8 +228,8 @@ final class ApiController
                 ],
             ],
             'window' => [
-                'start' => $startDate->format('Y-m-d H:i:s'),
-                'end' => $endDate->format('Y-m-d H:i:s'),
+                'start' => $windowFrom,
+                'end' => $windowTo,
                 'length' => $window,
                 'offset' => $offset,
             ],
