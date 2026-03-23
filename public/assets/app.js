@@ -1004,8 +1004,11 @@ function renderWindowTotals(payload, unit) {
     return `
         <div class="detail-window-totals">
             <div class="detail-window-totals-head">
-                <h3>Selected window totals</h3>
-                <p>${escapeHtml(formatDateRange(range.from || '', range.to || ''))}</p>
+                <div>
+                    <h3>Selected window totals</h3>
+                    <p>For the currently displayed chart range</p>
+                </div>
+                <span class="detail-window-totals-range">${escapeHtml(formatDateRange(range.from || '', range.to || ''))}</span>
             </div>
             <div class="detail-window-totals-grid">
                 <div class="detail-window-total-block tx">

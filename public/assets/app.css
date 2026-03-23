@@ -563,53 +563,62 @@ button:hover {
 }
 
 .detail-window-totals {
-    margin-top: 16px;
-    padding-top: 16px;
+    margin-top: 14px;
+    padding: 14px 16px 0;
     border-top: 1px solid var(--line);
     display: grid;
-    gap: 12px;
+    gap: 10px;
 }
 
 .detail-window-totals-head {
-    display: grid;
-    gap: 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: space-between;
+    gap: 10px 14px;
 }
 
 .detail-window-totals-head h3 {
     margin: 0;
-    font-size: 1rem;
+    font-size: 0.94rem;
 }
 
 .detail-window-totals-head p {
-    margin: 0;
+    margin: 3px 0 0;
     color: var(--muted);
-    font-size: 0.88rem;
+    font-size: 0.8rem;
+}
+
+.detail-window-totals-range {
+    color: var(--muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
 }
 
 .detail-window-totals-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: 8px;
 }
 
 .detail-window-total-block {
     display: grid;
-    gap: 4px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--panel-alt) 88%, var(--panel));
-    border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+    gap: 3px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--panel-alt) 78%, var(--panel));
+    border: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
 }
 
 .detail-window-total-block strong {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
 }
 
 .detail-window-total-block span {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--text);
 }
