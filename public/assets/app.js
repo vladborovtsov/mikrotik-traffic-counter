@@ -1627,7 +1627,7 @@ function drawChart(chartData, windowInfo, unit) {
     emptyDiv.style.display = 'none';
 
     google.charts.setOnLoadCallback(() => {
-        const useSimpleSafariChart = isSafariBrowser();
+        const useSimpleSafariChart = shouldUseSimpleDetailChart(chartData.length);
         const rootTheme = document.documentElement.getAttribute('data-theme') || 'light';
         const chartText = getCssVariable('--text', '#16221b');
         const chartMuted = getCssVariable('--muted', '#607064');
@@ -1749,10 +1749,14 @@ function drawChart(chartData, windowInfo, unit) {
     });
 }
 
-function isSafariBrowser() {
-    const userAgent = navigator.userAgent || '';
+function shouldUseSimpleDetailChart(pointCount) {
+    const chartMode = window.MikstatChartMode;
 
-    return /Safari\//.test(userAgent) && !/Chrome\/|Chromium\/|CriOS\/|Android/.test(userAgent);
+    if (!chartMode || typeof chartMode.shouldUseSimpleDetailChart !== 'function') {
+        return false;
+    }
+
+    return chartMode.shouldUseSimpleDetailChart(navigator.userAgent || '', pointCount);
 }
 
 window.addEventListener('popstate', () => {

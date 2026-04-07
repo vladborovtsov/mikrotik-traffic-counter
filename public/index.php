@@ -36,6 +36,7 @@ declare(strict_types=1);
             <div class="loading">Loading...</div>
         </div>
     </div>
+    <script src="assets/chart-mode.js"></script>
     <script src="assets/app.js"></script>
 </body>
 </html>
