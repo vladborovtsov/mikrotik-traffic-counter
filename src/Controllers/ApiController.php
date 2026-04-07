@@ -200,12 +200,7 @@ final class ApiController
                 $this->interfaceService->listByDeviceId($id)
             ),
             'selected_interface_id' => $interfaceId,
-            'chartData' => $this->trafficService->getChartData(
-                $id,
-                $windowFrom,
-                $windowTo,
-                $interfaceId
-            ),
+            'chartData' => $this->getDetailChartData($id, $windowFrom, $windowTo, $window, $interfaceId),
             'window_totals' => [
                 'data' => $this->trafficService->getSumStats($id, $windowFrom, $windowTo, $interfaceId),
                 'range' => ['from' => $windowFrom, 'to' => $windowTo],
@@ -462,6 +457,31 @@ final class ApiController
         }
 
         return $window;
+    }
+
+    /**
+     * @return array<int, array{hour: string, tx: float, rx: float}>
+     */
+    private function getDetailChartData(
+        int $deviceId,
+        string $windowFrom,
+        string $windowTo,
+        int $windowHours,
+        ?int $interfaceId
+    ): array {
+        if ($windowHours <= 24) {
+            return $this->trafficService->getChartData($deviceId, $windowFrom, $windowTo, $interfaceId);
+        }
+
+        if ($windowHours <= 72) {
+            return $this->trafficService->getChartDataForBucketMinutes($deviceId, $windowFrom, $windowTo, 10, $interfaceId);
+        }
+
+        if ($windowHours <= 24 * 14) {
+            return $this->trafficService->getChartDataForBucketMinutes($deviceId, $windowFrom, $windowTo, 60, $interfaceId);
+        }
+
+        return $this->trafficService->getChartDataForGranularity($deviceId, $windowFrom, $windowTo, 'day', $interfaceId);
     }
 
     private function getValidatedOffset(): int

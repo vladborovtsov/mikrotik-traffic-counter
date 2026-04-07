@@ -1611,8 +1611,9 @@ function bindStatsDrilldownActions() {
 function drawChart(chartData, windowInfo, unit) {
     const dashboardDiv = document.getElementById('dashboard_div');
     const emptyDiv = document.getElementById('chart_empty');
+    const filterDiv = document.getElementById('filter_div');
 
-    if (!dashboardDiv || !emptyDiv) {
+    if (!dashboardDiv || !emptyDiv || !filterDiv) {
         return;
     }
 
@@ -1626,6 +1627,7 @@ function drawChart(chartData, windowInfo, unit) {
     emptyDiv.style.display = 'none';
 
     google.charts.setOnLoadCallback(() => {
+        const useSimpleSafariChart = isSafariBrowser();
         const rootTheme = document.documentElement.getAttribute('data-theme') || 'light';
         const chartText = getCssVariable('--text', '#16221b');
         const chartMuted = getCssVariable('--muted', '#607064');
@@ -1636,9 +1638,9 @@ function drawChart(chartData, windowInfo, unit) {
         const data = new google.visualization.DataTable();
         data.addColumn('datetime', 'Timestamp');
         data.addColumn('number', `TX (${unit})`);
-        data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+        data.addColumn(useSimpleSafariChart ? { type: 'string', role: 'tooltip' } : { type: 'string', role: 'tooltip', p: { html: true } });
         data.addColumn('number', `RX (${unit})`);
-        data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+        data.addColumn(useSimpleSafariChart ? { type: 'string', role: 'tooltip' } : { type: 'string', role: 'tooltip', p: { html: true } });
 
         const divisor = {
             MB: 1024 ** 2,
@@ -1652,7 +1654,9 @@ function drawChart(chartData, windowInfo, unit) {
             const timestamp = formatTimestamp(point.hour);
             const tx = Number(point.tx || 0) / divisor;
             const rx = Number(point.rx || 0) / divisor;
-            const tooltip = `
+            const tooltip = useSimpleSafariChart
+                ? `${timestamp}\nUpload: ${formatTraffic(point.tx || 0, unit)}\nDownload: ${formatTraffic(point.rx || 0, unit)}`
+                : `
                 <div class="chart-tooltip">
                     <div class="chart-tooltip-title">${escapeHtml(timestamp)}</div>
                     <div class="chart-tooltip-line tx">Upload: ${escapeHtml(formatTraffic(point.tx || 0, unit))}</div>
@@ -1669,37 +1673,48 @@ function drawChart(chartData, windowInfo, unit) {
             ];
         }));
 
+        const chartOptions = {
+            legend: { position: 'top' },
+            backgroundColor: chartPanel,
+            height: 380,
+            pointSize: chartData.length > 400 ? 0 : 5,
+            lineWidth: 2,
+            chartArea: { left: 60, right: 20, top: 48, bottom: 60 },
+            colors: [txColor, rxColor],
+            legendTextStyle: { color: chartText },
+            hAxis: {
+                minValue: new Date(windowInfo.start.replace(' ', 'T')),
+                maxValue: new Date(windowInfo.end.replace(' ', 'T')),
+                textStyle: { color: chartMuted },
+                gridlines: { color: chartLine },
+                baselineColor: chartLine
+            },
+            vAxis: {
+                textStyle: { color: chartMuted },
+                gridlines: { color: chartLine },
+                baselineColor: chartLine
+            },
+            explorer: { axis: 'horizontal', keepInBounds: true },
+            tooltip: {
+                isHtml: !useSimpleSafariChart,
+                textStyle: { color: chartText }
+            }
+        };
+
+        if (useSimpleSafariChart) {
+            filterDiv.style.display = 'none';
+            const chart = new google.visualization.LineChart(document.getElementById('chart_div'));
+            chart.draw(data, chartOptions);
+            return;
+        }
+
+        filterDiv.style.display = 'block';
+
         const dashboard = new google.visualization.Dashboard(document.getElementById('dashboard_div'));
         const chart = new google.visualization.ChartWrapper({
             chartType: 'LineChart',
             containerId: 'chart_div',
-            options: {
-                legend: { position: 'top' },
-                backgroundColor: chartPanel,
-                height: 380,
-                pointSize: 5,
-                lineWidth: 2,
-                chartArea: { left: 60, right: 20, top: 48, bottom: 60 },
-                colors: [txColor, rxColor],
-                legendTextStyle: { color: chartText },
-                hAxis: {
-                    minValue: new Date(windowInfo.start.replace(' ', 'T')),
-                    maxValue: new Date(windowInfo.end.replace(' ', 'T')),
-                    textStyle: { color: chartMuted },
-                    gridlines: { color: chartLine },
-                    baselineColor: chartLine
-                },
-                vAxis: {
-                    textStyle: { color: chartMuted },
-                    gridlines: { color: chartLine },
-                    baselineColor: chartLine
-                },
-                explorer: { axis: 'horizontal', keepInBounds: true },
-                tooltip: {
-                    isHtml: true,
-                    textStyle: { color: chartText }
-                }
-            }
+            options: chartOptions
         });
 
         const control = new google.visualization.ControlWrapper({
@@ -1732,6 +1747,12 @@ function drawChart(chartData, windowInfo, unit) {
         dashboard.bind(control, chart);
         dashboard.draw(data);
     });
+}
+
+function isSafariBrowser() {
+    const userAgent = navigator.userAgent || '';
+
+    return /Safari\//.test(userAgent) && !/Chrome\/|Chromium\/|CriOS\/|Android/.test(userAgent);
 }
 
 window.addEventListener('popstate', () => {
